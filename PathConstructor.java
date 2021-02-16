@@ -3,35 +3,6 @@ import java.util.*;
 import edu.wpi.first.wpilibj.*;
 import com.revrobotics.*;
 
-class BezierProfile{
-    float init_x, init_y;
-    float ref1_x, ref1_y;
-    float ref2_x, ref2_y;
-    float final_x, final_y;
-    public BezierProfile(float init_x, float init_y, float ref1_x,float ref1_y, float ref2_x, float ref2_y, float final_x, float final_y){
-      this.init_x = init_x;
-      this.init_y = init_y;
-      this.ref1_x = ref1_x;
-      this.ref1_y = ref1_y;
-      this.ref2_x = ref2_x;
-      this.ref2_y = ref2_y;
-      this.final_x = final_x;
-      this.final_y = final_y;
-    }
-    
-    //takes some input [0,1]
-    float return_x(float x){
-    double v = (init_x * Math.pow( (1-x), 3)) +(3*x * (1-x) * (1-x) * ref1_x) + (3*x*x * (1-x) * ref2_x)+ (Math.pow(x,3) * final_x);
-    return (float)(v);
-  }
-  float return_y(float x){
-     double v = (init_y * Math.pow( (1-x), 3)) +(3*x * (1-x)*(1-x) * ref1_y) + (3*x*x * (1-x) * ref2_y)+ (Math.pow(x,3) * final_y);
-    return (float)(v);
-  }
-}
-  
-
-
 
 public class PathConstructor {
     //assume that 
