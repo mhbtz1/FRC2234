@@ -1,11 +1,14 @@
 //cubic bezier curve can be represented as:
 //B(x) = (1-x)^3 * (P0) + 3x(1-x)^2 * (P1) + 3x^2(1-x)*(P2) + x^3 * (P3)
 
-class Point{
+class Location{
   float x, y;
-  public Point(float x, float y){
+  public Location(float x, float y){
     this.x = x;
     this.y = y;
+  }
+  public int hashCode(){
+    return (int)(x) ^ (int)(y);
   }
 }
 
