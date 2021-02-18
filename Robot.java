@@ -108,6 +108,7 @@ public class Robot extends TimedRobot {
     pathProf = new Profile(obstacleList);
     pathConst = new PathConstructor(20, obstacleList, d);
     g1.calibrate();
+    pathProf.iterate_profiles();
   }
 
   /**
