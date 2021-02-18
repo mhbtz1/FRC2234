@@ -39,7 +39,7 @@ public class Profile {
         }
         //PREDICATED ON SOME SEED STARTING POSITION
         Location cur_pos= new Location(0,0);
-        for(int i = 0; i < path.size(); i++){
+        for(int i = 0; i < true_waypoints.size(); i++){
             Location vel = path.get(i).subtract(cur_pos);
             vel.x /= 6;
             vel.y /= 6;
@@ -103,6 +103,7 @@ public class Profile {
         }
         if(!ANGLE_FILE_HAS_BEEN_INITIALIZED){
             constructAngleMap();
+            constructVelocityMap();
             ANGLE_FILE_HAS_BEEN_INITIALIZED=true;
         }
       }
