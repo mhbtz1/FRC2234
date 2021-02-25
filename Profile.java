@@ -18,34 +18,43 @@ public class Profile {
     public ArrayList<Location> waypoints;
     public ArrayList<BezierProfile> bez;
     public boolean ANGLE_FILE_HAS_BEEN_INITIALIZED;
+    public static final double ANGLE_SHIFTING_FACTOR = 0;
     public Profile(ArrayList<Location> path){
         this.path = path;
         velocity_profile = new HashMap<Integer, Location>();
         acceleration_profile = new HashMap<Integer, Location>();
         angle_profile = new HashMap<Integer, Double>();
-        MY_CURRENT_POSITION = new Location(0,0);
+        this.MY_CURRENT_POSITION = new Location(200,300);
+        this.true_waypoints = new ArrayList<Location>();
+        this.waypoints = new ArrayList<Location>();
+        this.bez = new ArrayList<BezierProfile>();
+        ANGLE_FILE_HAS_BEEN_INITIALIZED = false;
+    }
+    public Profile(){
+        velocity_profile = new HashMap<Integer, Location>();
+        acceleration_profile = new HashMap<Integer, Location>();
+        angle_profile = new HashMap<Integer, Double>();
+        this.MY_CURRENT_POSITION = new Location(200,300);
         this.true_waypoints = new ArrayList<Location>();
         this.waypoints = new ArrayList<Location>();
         this.bez = new ArrayList<BezierProfile>();
         ANGLE_FILE_HAS_BEEN_INITIALIZED = false;
     }
     public void resetLocation(){
-        MY_CURRENT_POSITION = new Location(0,0);
+        this.MY_CURRENT_POSITION = new Location(200,300);
     }
     //assume that the time over wich velocity/acceleration changes is 1 unit
     public void constructVelocityMap(){
-        if(path == null){
-            return;
-        }
+        System.out.println("PATH SIZE: " + true_waypoints.size());
         //PREDICATED ON SOME SEED STARTING POSITION
-        Location cur_pos= new Location(0,0);
+        Location cur_pos= new Location(200,200);
         for(int i = 0; i < true_waypoints.size(); i++){
-            Location vel = path.get(i).subtract(cur_pos);
+            Location vel = true_waypoints.get(i).subtract(cur_pos);
             vel.x /= 6;
             vel.y /= 6;
             velocity_profile.put(i,vel);
             System.out.println("WAYPOINT INDEX: " + i  + "VELOCITY: " + vel.x + " " + vel.y);
-            cur_pos= path.get(i);
+            cur_pos= true_waypoints.get(i);
         }
     }
     public boolean loc_contains(ArrayList<Location> targ, Location tst){
@@ -64,16 +73,17 @@ public class Profile {
         //String[] r = loadStrings("controlPoints.txt");
         ArrayList<Location> remove_duplicates = new ArrayList<Location>();
         try{
-            String s = "C:\\Users\\Core\\pathfinding_stuff-Imported\\src\\main\\java\\frc\\robot\\controlPathBehavior.txt";
+            String s = Filesystem.getDeployDirectory() + "/controlPathBehavior.txt";
             BufferedReader r = new BufferedReader(new FileReader(s) );
             String inp = "";
             while( (inp = r.readLine() ) != null){
             double one = Double.parseDouble(inp.substring(0, inp.indexOf(":")));
             double two = Double.parseDouble(inp.substring(inp.indexOf(":")+1));
+            //System.out.println(one + ":" + two);
             int hc = (new Location( (float)(one), (float)(two) ) ).hashCode();
             if(loc_contains(remove_duplicates, new Location( (float)(one), (float)(two) ) ) ){continue;}
-            remove_duplicates.add(new Location( (float)(one), (float)(two) ) );
-            ans.add(new Location( (float)(one), (float)(two) ) );
+                remove_duplicates.add(new Location( (float)(one), (float)(two) ) );
+                ans.add(new Location( (float)(one), (float)(two) ) );
             //println("POINT: " + one + " " + two);
             }
             r.close();
@@ -83,30 +93,30 @@ public class Profile {
         return new ArrayList<Location>(remove_duplicates);
     }
 
+    //check out some weird stalling points, the robot is following the path, yet at waypoint 26 it gets stuck on a straight path
     public void iterate_profiles(){
-        if(waypoints.size() == 0){
+        //if(waypoints.size() == 0){
           waypoints = parseFile();
+          System.out.println("SIZE: " + waypoints.size());
           int ITER = 200;
-          if(bez.size() == 0){
-            for(int i = 0; i < waypoints.size()-ITER; i+= ITER){
+          for(int i = 0; i < waypoints.size()-ITER; i+= ITER){
               //println(waypoints.get(i).x + " " + waypoints.get(i).y);
               BezierProfile b = new BezierProfile(waypoints.get(i).x,waypoints.get(i).y,waypoints.get(i+ITER/4).x,waypoints.get(i+ITER/4).y,waypoints.get(i+ITER/2).x,waypoints.get(i+ITER/2).y,waypoints.get(i+ITER).x,waypoints.get(i+ITER).y);
               bez.add(b);
             }
-          }
-        }
+        int idx = 0;
         for(BezierProfile b : bez){
           for(float j = 0; j <= 1.0; j += 0.04){
-            //println(b.return_x(j) + " " + b.return_y(j));
+            System.out.println("POINT: " + idx  +  " " + b.return_x(j) + " " + b.return_y(j));
             true_waypoints.add(new Location(b.return_x(j), b.return_y(j)));
+            ++idx;
           }
         }
-        if(!ANGLE_FILE_HAS_BEEN_INITIALIZED){
-            constructAngleMap();
-            constructVelocityMap();
-            ANGLE_FILE_HAS_BEEN_INITIALIZED=true;
-        }
-      }
+
+        constructAngleMap();
+        constructVelocityMap();
+        ANGLE_FILE_HAS_BEEN_INITIALIZED=true;
+    }
 
     public void constructAccelerationMap(){
         if(path == null){
@@ -117,27 +127,24 @@ public class Profile {
             acceleration_profile.put(i, acc);
         }
     }
-    public HashMap<Integer,Double> constructAngleMap(){
-        HashMap<Integer,Double> angle_profile = new HashMap<Integer,Double>();
-        if(true_waypoints == null){
-            return new HashMap<Integer,Double>();
-        }
-        try{ 
-            String s = "C:\\Users\\Core\\pathfinding_stuff-Imported\\src\\main\\java\\frc\\robot\\the_angles.txt";
-            BufferedWriter  r= new BufferedWriter( new FileWriter( s ) );
+    public void constructAngleMap(){
+        //try{ 
+          //  String s = Filesystem.getDeployDirectory() + "/the_angles.txt";
+            //BufferedWriter  r= new BufferedWriter( new FileWriter( s ) );
             for(int i = 0; i < true_waypoints.size() - 1; i++){
                 double avl = Math.atan( (double)( true_waypoints.get(i+1).y - true_waypoints.get(i).y)/(double)(true_waypoints.get(i+1).x - true_waypoints.get(i).x) ) * ((double)(180)/(double)(Math.PI));
-                angle_profile.put(i,avl);
-                System.out.println("ANGLE AT TIME: " + i +  " IS: "  + avl);
-                r.write(Double.toString(avl).toCharArray());
-                System.out.println("WAYPOINT INDEX: " + i + "ANGLE: " + avl);
+                double mult = 1.0;
+             
+                angle_profile.put(i, ( avl + (ANGLE_SHIFTING_FACTOR) ) );
+                //System.out.println("ANGLE AT TIME: " + i +  " IS: "  + avl);
+                //r.write(Double.toString(avl).toCharArray());
+                System.out.println("WAYPOINT INDEX: " + i + "ANGLE: " + ( -1 * (avl+ANGLE_SHIFTING_FACTOR) ) );
             }
-            r.close();
-        } catch(Exception e){
-            e.printStackTrace();
-        }
+            //r.close();
+        //} catch(Exception e){
+        //    e.printStackTrace();
+        //}
         System.out.println("ANGLES HAVE BEEN ASSIGNED");
-        return angle_profile;
     }
 
     public void angle_dead_reckoning(){
@@ -153,8 +160,8 @@ public class Profile {
         //System.out.println("PREVIOUS X: " + MY_CURRENT_POSITION.x);
         //System.out.println("COSINE VALUE: " + Math.cos(angle * ( (double)(Math.PI)/(double)(180)) ) );
         //System.out.println("SINE VALUE: " +  Math.sin(angle * ( (double)(Math.PI)/(double)(180)) ) );
-        MY_CURRENT_POSITION.x += Location.magnitude(velocity) * 0.09 *  Math.cos( (angle) * ( (double)(Math.PI)/(double)(180)) );
-        MY_CURRENT_POSITION.y += Location.magnitude(velocity) * 0.09 * Math.sin( (angle) * ( (double)(Math.PI)/(double)(180)) );
+        MY_CURRENT_POSITION.x += Location.magnitude(velocity) * 0.8  * Math.cos( (angle) * ( (double)(Math.PI)/(double)(180)) );
+        MY_CURRENT_POSITION.y += Location.magnitude(velocity) * 0.8  * Math.sin( (angle) * ( (double)(Math.PI)/(double)(180)) );
         //System.out.println("PREVIOUS X: " + MY_CURRENT_POSITION.x);
     }
     public boolean isWithinThreshold(Location goal){
@@ -163,4 +170,5 @@ public class Profile {
     }
     
 }
+
 
