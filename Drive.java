@@ -1,174 +1,225 @@
+/*----------------------------------------------------------------------------*/
+/* Copyright (c) 2017-2018 FIRST. All Rights Reserved.                        */
+/* Open Source Software - may be modified and shared by FRC teams. The code   */
+/* must be accompanied by the FIRST BSD license file in the root directory of */
+/* the project.                                                               */
+/*----------------------------------------------------------------------------*/
+
 package frc.robot;
-import edu.wpi.first.wpilibj.*;
-import com.revrobotics.*;
+
 import java.util.*;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import com.revrobotics.*;
+import edu.wpi.first.wpilibj.*;
 
-public class Drive{
-    Joystick j1;
-    CANSparkMax c1, c2;
-    CANPIDController pc1, pc2;
-    ADXRS450_Gyro g1;
-    ArrayList<Location> waypoints;
-    Profile p;
-    int INTERNAL_COUNTER;
-    boolean ANGLE_HANDLER = false;
-    int angle_ptr;
-    int obstacle_ptr;
-    double cur_angle= 0;
-    boolean IS_MODULATING_ANGLE = false;
-    public Drive(Joystick j1, CANSparkMax c1, CANSparkMax c2, ADXRS450_Gyro g1){
-        this.j1 = j1;
-        this.c1 = c1;
-        this.c2 =c2;
-        this.g1 = g1;
-        pc1 = c1.getPIDController();
-        pc2 = c2.getPIDController();
-        g1.calibrate();
-        angle_ptr = 0;
-        INTERNAL_COUNTER = 0;
-        obstacle_ptr = 0;
+/**
+ * The VM is configured to automatically run this class, and to call the
+ * functions corresponding to each mode, as described in the TimedRobot
+ * documentation. If you change the name of this class or the package after
+ * creating this project, you must also update the build.gradle file in the
+ * project.
+ */
+public class Robot extends TimedRobot {
+  private static final String kTestDrive = "test generic";
+  private static final String kTestAngle = "test angle";
+  private static final String kTestAutonDrive = "test auton drive";
+  private String m_autoSelected;
+  public static double DEADZONE_VALUE_RIGHT = 0.1;
+  public static double DEADZONE_VALUE_LEFT = -0.1;
+  private final SendableChooser<String> m_chooser = new SendableChooser<>();
+  public CANSparkMax c1, c2;
+  public CANEncoder e1, e2;
+  public CANPIDController pc1, pc2;
+  public ADXRS450_Gyro g1;
+  public Joystick prim_joy;
+  public Drive d;
+  public static double P = 0.15;
+  public static double I = 0.001;
+  public static double D = 0;
+  public static double inc_error= 0;
+  public static boolean TOG_ROT = false;
+  PIDControl anglePID;
+  public static int dx[] = {1,0,-1,0};
+  public static int dy[] = {0,1,0,-1};
+  public static int angVal = 21;
+  public static ArrayList<Location> obstacleList;
+  public static ArrayList<Integer> setAngles;
+  Profile pathProf;
+  PathConstructor pathConst;
+  boolean butTog = false;
+  
+  public static double deadzone(double signal){
+    return (signal >= Robot.DEADZONE_VALUE_LEFT && signal <= Robot.DEADZONE_VALUE_RIGHT ? 0 : signal);
+  }
+  public static double deadzone_continuous(double signal){
+    double ret = (1/ (1 + Math.pow(Math.E, -1 * signal)));
+    return ret;
+  }
+  /**
+   * This function is run when the robot is first started up and should be
+   * used for any initialization code.
+   * 
+   * 
+   */
+
+   public Robot(){
+    c2 = new CANSparkMax(6, CANSparkMaxLowLevel.MotorType.kBrushless);
+    c1 = new CANSparkMax(2, CANSparkMaxLowLevel.MotorType.kBrushless);
+    pc1 = c1.getPIDController();
+    pc2 = c2.getPIDController();
+   }
+
+   //this creates a rectangular path with its control points
+   public void testRectangularLocations(){
+     obstacleList.add(new Location(2160,0));
+     obstacleList.add(new Location(2160,-2088));
+     obstacleList.add(new Location(0,-2088));
+     obstacleList.add(new Location(0,0));
+   }
+   
+
+  @Override
+  public void robotInit() {
+    m_chooser.setDefaultOption("Test generic", kTestDrive);
+    m_chooser.addOption("Test angle", kTestAngle);
+    m_chooser.addOption("Test auton drive", kTestAutonDrive);
+    //SmartDashboard.putData("Auto choices", m_chooser);
+    prim_joy = new Joystick(0);
+    g1 = new ADXRS450_Gyro(SPI.Port.kOnboardCS0);
+    anglePID = new PIDControl(P,I,D);
+    pc1.setP(P);
+    pc1.setI(I);
+    pc1.setD(D);
+    pc2.setP(P);
+    pc2.setI(I);
+    pc2.setD(D);
+    obstacleList = new ArrayList<Location>();
+    testRectangularLocations();
+    for(Location l : obstacleList){
+        System.out.println(l.x + " " + l.y);
     }
-    public Drive(CANSparkMax c1, CANSparkMax c2, ADXRS450_Gyro g1){
-        this.c1 = c1;
-        this.c2 = c2;
-        this.g1 = g1;
-        g1.calibrate();
-        angle_ptr = 0;
+    setAngles = new ArrayList<Integer>();
+    for(int i = 10; i <= 360; i+= 10){
+      setAngles.add(i);
     }
-    public Drive(Joystick j1, CANSparkMax c1, CANSparkMax c2, ADXRS450_Gyro g1, ArrayList<Location> waypoints){
-        this.j1 = j1;
-        this.c1 = c1;
-        this.c2 = c2;
-        this.g1 = g1;
-        pc1 = c1.getPIDController();
-        pc2 = c2.getPIDController();
-        this.waypoints = waypoints;
-        p = new Profile(waypoints);
-        p.constructVelocityMap();
-        //p.constructAccelerationMap();
-        //p.constructAngleMap();
-        p.angle_dead_reckoning();
-        System.out.println("DRIVE INITALIZED");
-        g1.calibrate();
-        angle_ptr = 0;
-    }
+    d = new Drive(prim_joy,c1,c2,g1,obstacleList);
+    System.out.println("SKIP");
+    pathProf = new Profile();
+    pathConst = new PathConstructor(20, obstacleList, d);
+    g1.calibrate();
+    pathProf.iterate_profiles();
+  }
 
-    public void drive(){
-        c1.set( (Robot.deadzone(j1.getRawAxis(0) + j1.getRawAxis(1)))/4);
-        c2.set( (Robot.deadzone(j1.getRawAxis(0) - j1.getRawAxis(1)))/4);
-        //System.out.println("SET C1: " +  (Robot.deadzone(j1.getRawAxis(0) + j1.getRawAxis(1)))/4);
-        //System.out.println("SET C2: " + (Robot.deadzone(j1.getRawAxis(0) - j1.getRawAxis(1)))/4);
-    }
-
-    public void modifiedDrive(){
-        if(waypoints == null){
-            return;
-        }   
-
-        //THIS MOVES FORWARD
-        //pc1.setReference(1.5, ControlType.kVoltage);
-        //pc2.setReference(-1.5, ControlType.kVoltage);
-        //THIS MOVES BACKWARD
-        //pc1.setReference(-1.5, ControlType.kVoltage);
-        //pc2.setReference(1.5, ControlType.kVoltage);
-        
-        if(obstacle_ptr < Robot.obstacleList.size()){
-            if(!IS_MODULATING_ANGLE){
-                double mag1 = Location.magnitude(p.velocity_profile.get(obstacle_ptr)) * 8;
-                if(!p.isWithinThreshold(Robot.obstacleList.get(obstacle_ptr))){
-                    pc1.setReference(mag1/1208, ControlType.kVoltage);
-                    pc2.setReference(-mag1/1208, ControlType.kVoltage);
-                    p.updateMyPosition(p.velocity_profile.get(obstacle_ptr),cur_angle);
-                    System.out.println("X POSITION: " + p.MY_CURRENT_POSITION.x);
-                    System.out.println("Y POSITION: " + p.MY_CURRENT_POSITION.y);
-                } else {
-                    System.out.println("MODULATING ANGLE ON");
-                    IS_MODULATING_ANGLE=true;
-                }
-            } else {
-                //System.out.println("THRESHOLD HAS BEEN REACHED, MODULATING ANGLE.");
-                if(angleUpdate(p.angle_profile.get(obstacle_ptr), new PIDControl(Robot.P, Robot.I, Robot.D))){
-                    cur_angle = p.angle_profile.get(obstacle_ptr);
-                    ++obstacle_ptr;
-                    System.out.println("ANGLE MODULATION COMPLETE!");
-                    IS_MODULATING_ANGLE=false;
-                }
-            }
-        }
-
-
-
-
-        /*
-        if(INTERNAL_COUNTER < waypoints.size() - 1){
-            if(angleUpdate(p.angle_profile.get(INTERNAL_COUNTER), new PIDControl(Robot.P, Robot.I, Robot.D))){
-                if(Location.is_greater_or_equal(p.MY_CURRENT_POSITION, waypoints.get(INTERNAL_COUNTER))){
-                    ++INTERNAL_COUNTER;
-                } else {
-                    Location absVel = p.velocity_profile.get(INTERNAL_COUNTER);
-                    pc1.setReference( Location.magnitude(absVel), ControlType.kVoltage);
-                    pc2.setReference( -Location.magnitude(absVel), ControlType.kVoltage);
-                    p.updateMyPosition(absVel);
-                }
-            }
-        }
-        */
-        
-    }
-
-    public void moveToCertainAngles(ArrayList<Integer> angles){
-        if(angleUpdate(angles.get(angle_ptr), new PIDControl(Robot.P, Robot.I, Robot.D))){
-            angle_ptr++;
-        }
-    }
-
-    public double map_between_stuff(double value){
-        double ans = (value - 0)/(0.5-0);
-        return ans;
-    }
-
-    public boolean angleUpdate(double setpoint, PIDControl p){
-        double error = p.P * (setpoint - g1.getAngle());
-        //+p.I * p.INC_ERROR;
-        /*
-        pc1.setReference(error, ControlType.kVelocity);
-        pc2.setReference(error, ControlType.kVelocity);
-        */
-        SmartDashboard.putString("TARGET: " , Double.toString(setpoint));
-        SmartDashboard.putString("CURRENT: " , Double.toString(g1.getAngle()));
-        double set_sparks = error * (double)(1)/(double)(28);
-        c1.set(set_sparks);
-        c2.set(set_sparks);
-        SmartDashboard.putString("VALUE FOR SPARK TURNING: " , Double.toString(set_sparks));
-        p.INC_ERROR += error;
-        //System.out.println("SETPOINT: " + setpoint + "CURRENT ANGLE: " + g1.getAngle());
-        if( Math.abs(g1.getAngle() - setpoint) <= 10){
-            p.error_reset();
-            //System.out.println("TRUE");
-            return true;
-        }
-        //System.out.println("FALSE");
-        return false;
-    }
-
-    public void printInformation(){
-        for(int i = 0; i < Robot.obstacleList.size(); i++){
-            Location l = Robot.obstacleList.get(i);
-            if(i < Robot.obstacleList.size() - 1){
-                double vel = Location.magnitude(p.velocity_profile.get(i));
-                double ang = p.angle_profile.get(i);
-                System.out.println("VELOCITY: " + vel);
-                System.out.println("ANGLE: " + ang);
-            }
-            System.out.println("POSITION: " + l.x + " " + l.y);
-        }
-    }
-
+  /**
+   * This function is called every robot packet, no matter the mode. Use
+   * this for items like diagnostics that you want ran during disabled,
+   * autonomous, teleoperated and test.
+   *
+   * <p>This runs after the mode specific periodic functions, but before
+   * LiveWindow and SmartDashboard integrated updating.
+   */
+  @Override
+  public void robotPeriodic() {
     
+  }
+
+  /**
+   * This autonomous (along with the chooser code above) shows how to select
+   * between different autonomous modes using the dashboard. The sendable
+   * chooser code works with the Java SmartDashboard. If you prefer the
+   * LabVIEW Dashboard, remove all of the chooser code and uncomment the
+   * getString line to get the auto name from the text box below the Gyro
+   *
+   * <p>You can add additional auto modes by adding additional comparisons to
+   * the switch structure below with additional strings. If using the
+   * SendableChooser make sure to add them to the chooser code above as well.
+   */
+  @Override
+  public void autonomousInit() {
+    m_autoSelected = m_chooser.getSelected();
+    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
+    System.out.println("Auto selected: " + m_autoSelected);
+  }
+
+  /**
+   * This function is called periodically during autonomous.
+   */
+  @Override
+  public void autonomousPeriodic() {
+    /*
+    switch (m_autoSelected) {
+      case kCustomAuto:
+        // Put custom auto code here
+        break;
+      case kDefaultAuto:
+      default:
+        // Put default auto code here
+        break;
+    }
+    */
+  }
+
+  /**
+   * This function is called periodically during operator control.
+   */
+  @Override
+  public void teleopPeriodic() {
+    d.drive();
+    if(prim_joy.getRawButton(1)){
+      d.angleUpdate(angVal,anglePID);
+    }
 
 
+    /*
+    if(prim_joy.getRawButton(2)){
+      angVal += 3;
+      System.out.println("INCREMENT: "  + angVal);
+    }
+    */
+    SmartDashboard.putString("ANGLE VALUE: " , Double.toString(g1.getAngle()));
+    if(prim_joy.getRawButton(3)){
+      d.modifiedDrive(pathProf);
+    }
+    
+    if(prim_joy.getRawButton(4) && d.angle_ptr < setAngles.size()){
+      d.moveToCertainAngles(setAngles);
+    }
+    
+    if(prim_joy.getRawButton(2)){
+      d.printInformation();
+    }
+    
+    /*
+    if(prim_joy.getRawButton(3) && d.angle_ptr < setAngles.size()){
+        d.moveToCertainAngles(setAngles);
+    }
+    */
 
+
+    //System.out.println("ANGLE: " + g1.getAngle());
+    /*
+    if(prim_joy.getRawButtonPressed(1)){
+      c1.set(0.05);
+    }
+    */
+  }
+
+  /**
+   * This function is called periodically during test mode.
+   */
+  @Override
+  public void testPeriodic() {
+    c1.set(deadzone(prim_joy.getRawAxis(1)));
+    c2.set(-deadzone(prim_joy.getRawAxis(1)));
+  }
+
+  public void disabledInit(){
+      pathProf.resetLocation();
+      d.obstacle_ptr = 0;
+      d.cur_angle = 0;
+      d.IS_MODULATING_ANGLE = false;
+      System.out.println("RESET INIT HAS BEEN RAN");
+  }
 }
