@@ -9,7 +9,7 @@ class BezierProfile{
         double final_x, final_y;
         
 
-		public BezierProfile(double x, double y, double x2, double y2, double x3, double y3, double x4, double y4) {
+	public BezierProfile(double x, double y, double x2, double y2, double x3, double y3, double x4, double y4) {
             this.init_x = x;
             this.init_y = y;
             this.ref1_x = x2;
