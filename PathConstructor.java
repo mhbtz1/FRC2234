@@ -4,6 +4,8 @@ import edu.wpi.first.wpilibj.*;
 import com.revrobotics.*;
 
 
+//ignore this for the moment; this will be more important when the processing pathfinder code is transported into the main FRC code
+
 public class PathConstructor {
     //assume that 
     double SENSING_RADIUS;
