@@ -21,6 +21,22 @@ import edu.wpi.first.wpilibj.*;
  * creating this project, you must also update the build.gradle file in the
  * project.
  */
+
+
+/*
+CURRENT ISSUES:
+
+
+There are some odd degeneracies that happen with very contrived paths
+I believe this is happening due to oversampling/undersamping the path and then applying 
+Bezier curves to it, since tweaking the ITER parameter in Profile makes this issue resolve relatively well
+
+Also, implementing a better heuristic with the tangent bug algorithm (as opposed to the current naive bugnav)
+should resolve itself because these degeneracies are caused by jolts in the path
+which the tangent bug handles better
+
+
+*/
 public class Robot extends TimedRobot {
   private static final String kTestDrive = "test generic";
   private static final String kTestAngle = "test angle";
@@ -65,7 +81,7 @@ public class Robot extends TimedRobot {
    */
 
    public Robot(){
-    c2 = new CANSparkMax(6, CANSparkMaxLowLevel.MotorType.kBrushless);
+    c2 = new CANSparkMax(4, CANSparkMaxLowLevel.MotorType.kBrushless);
     c1 = new CANSparkMax(2, CANSparkMaxLowLevel.MotorType.kBrushless);
     pc1 = c1.getPIDController();
     pc2 = c2.getPIDController();
@@ -78,6 +94,7 @@ public class Robot extends TimedRobot {
      obstacleList.add(new Location(0,-2088));
      obstacleList.add(new Location(0,0));
    }
+   
 
   @Override
   public void robotInit() {
@@ -105,7 +122,7 @@ public class Robot extends TimedRobot {
     }
     d = new Drive(prim_joy,c1,c2,g1,obstacleList);
     System.out.println("SKIP");
-    pathProf = new Profile(obstacleList);
+    pathProf = new Profile();
     pathConst = new PathConstructor(20, obstacleList, d);
     g1.calibrate();
     pathProf.iterate_profiles();
@@ -121,6 +138,7 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
+    
   }
 
   /**
@@ -178,7 +196,7 @@ public class Robot extends TimedRobot {
     */
     SmartDashboard.putString("ANGLE VALUE: " , Double.toString(g1.getAngle()));
     if(prim_joy.getRawButton(3)){
-      d.modifiedDrive();
+      d.modifiedDrive(pathProf);
     }
     
     if(prim_joy.getRawButton(4) && d.angle_ptr < setAngles.size()){
@@ -221,3 +239,4 @@ public class Robot extends TimedRobot {
       System.out.println("RESET INIT HAS BEEN RAN");
   }
 }
+
