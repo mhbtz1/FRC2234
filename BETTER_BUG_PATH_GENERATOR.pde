@@ -10,7 +10,7 @@ class TangentBug{
   public void setObstacles(ArrayList<Location> obstacles){
     this.obstacles = obstacles;
   }
-  //returns angle values representing the points at which an obstacle is hit by some casted line
+  //returns angle values representing the points at which an obstacle is hit by some casted line (uses binary search + an angular sweep)
   
   public float does_hit(float sx, float sy, float angle){
     //perform a binary search along the line for the point at which the raycasted line (would potentially) hit the edge of some obsacle
@@ -50,13 +50,27 @@ class TangentBug{
     
     public void tangent_bug_path(){
       while(true){
+        float prev_opt_ang = -1;
         ArrayList<PVector> valid_angles = angular_sweep();
         if(valid_angles.size() != 0){
            float relax_dist = 1000000000;
+           float opt_ang = -1;
            for(PVector info : valid_angles){
-                
+                if(info.y >= 0.95){
+                  continue;
+                } else {
+                  float p1 = stbug.current_loc.x + (info.y * cos(info.x) * stbug.sensing_radius);
+                  float p2 = stbug.current_loc.y + (info.y * cos(info.x) * stbug.sensing_radius);
+                  float dist = dist(stbug.current_loc.x, stbug.current_loc.y, p1,p2) + dist(p1,p2,stbug.goal_loc.x,stbug.goal_loc.y);
+                  if(min(dist,relax_dist)==dist){
+                    opt_ang = info.x;
+                  }
+                }
            }
+           prev_opt_ang = opt_ang;
+           stbug.updateLocation(new PVector(stbug.sensing_radius*cos(opt_ang),stbug.sensing_radius*sin(opt_ang)));
         } else {
+          stbug.updateLocation(new PVector(stbug.sensing_radius*cos(prev_opt_ang), stbug.sensing_radius * sin(prev_opt_ang)));
         }
       }
     }
