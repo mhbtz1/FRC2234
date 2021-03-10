@@ -1,6 +1,4 @@
 
-//note that 
-
 class TangentBug extends Bug{
   ArrayList<Location> obstacles;
   float OPTIM_FACTOR = 3.2;
@@ -16,6 +14,7 @@ class TangentBug extends Bug{
   public TangentBug(float sensing_radius, ArrayList<Location> past_places, Location current_loc, Location goal_loc){
     super(sensing_radius,past_places,current_loc,goal_loc);
     obstacles = new ArrayList<Location>();
+    //controlPoints = createWriter("controlPoints.txt");
   }
   
   public void setObstacles(ArrayList<Location> obstacles){
@@ -72,7 +71,7 @@ class TangentBug extends Bug{
   public PVector final_angular_sweep(){
     PVector opt = new PVector(100000008, -1);
     for(float i = 0; i < 2 * PI; i += 0.02){
-      float eins = leave_heuristic(i,60);
+      float eins = leave_heuristic(i,40);
       if( min(opt.x, eins) == eins){
         opt.x = eins;
         opt.y = i;
@@ -135,6 +134,7 @@ class TangentBug extends Bug{
         float FAILSAFE = atan((this.goal_loc.y-this.current_loc.y)/(this.goal_loc.x-this.current_loc.x));
         float prev_opt_ang = atan((this.goal_loc.y-this.current_loc.y)/(this.goal_loc.x-this.current_loc.x));
         ArrayList<PVector> valid_angles = angular_sweep(2);
+        controlPoints.println(this.current_loc.x+":"+this.current_loc.y);
         if(valid_angles.size() != 0){
           float relax_dist = 1000000000;
           if(CURRENT_POINT_NAVIGATED_TO != null){
@@ -175,8 +175,7 @@ class TangentBug extends Bug{
            //check the case where some point in your sensing space is closer to the goal than the chosen CURRENT_POINT_NAVIGATED_TO
            PVector param = final_angular_sweep();
            if(min(relax_dist, param.x)==param.x){
-             opt_ang = param.y;
-             
+             //opt_ang = param.y;
            }
            prev_opt_ang = opt_ang;
            println("OPTIMAL ANGLE: " + opt_ang);
@@ -188,6 +187,7 @@ class TangentBug extends Bug{
       } 
       
       if(b){
+        SET_OF_WAYPOINTS=true;
         println("TANGENT BUG HAS FOUND ENDPOINT!");
       }
       
