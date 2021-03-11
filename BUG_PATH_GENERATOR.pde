@@ -1,7 +1,7 @@
 //bug pathfinding algorithm presentation:
 //https://spacecraft.ssl.umd.edu/academics/788XF14/788XF14L14/788XF14L14.pathbugsmapsx.pdf
 
-
+import java.util.*;
 
 //WLOG we will assume our bugs position (x,y)  <= our goal position (gx, gy), since we can consider our bug starting at the goal position and navigating to its "initial" position, in thtat case
 
@@ -15,6 +15,9 @@ class Bug{
   ArrayList<Integer> known_displacements = new ArrayList<Integer>();
   Location current_loc;
   Location goal_loc;
+  public Bug(){
+    
+  }
   public Bug(float sensing_radius, ArrayList<Location> past_places, Location current_loc, Location goal_loc){
     this.sensing_radius = sensing_radius;
     this.past_places = past_places;
@@ -26,7 +29,7 @@ class Bug{
   }
   public boolean isContained(Location match){
     for(Location l : past_places){
-      if(l.x == match.x && l.y == match.y){
+      if(l.equals(match)){
         return true;
       }
     }
@@ -41,19 +44,16 @@ class Bug{
     Location two = bg.past_places.get(WINDOW_SIZE - 1);
     return dist(one.x,one.y,two.x,two.y) <= 2.5;
   }
-}
-
-class Location{
-  public float x;
-  public float y;
-  Location(float x, float y){
-    this.x=x;
-    this.y=y;
+  public void updateLocation(PVector v){
+    this.current_loc.x+=v.x;
+    this.current_loc.y+=v.y;
   }
 }
 
+
 //we will simply draw shapes into the map to give us the obstacles in the space.
 Bug bg;
+TangentBug tbg;
 MotionProfiler mr;
 //Perfect_Preprocessing prcs;
 PrintWriter controlPoints;
@@ -62,7 +62,7 @@ ArrayList<Location> bad_places = new ArrayList<Location>();
 Location current_loc = new Location(200,300);
 Location goal_loc = new Location(800,400);
 boolean draw_obstacle = true;
-boolean SET_OF_WAYPOINTS = false ;
+boolean SET_OF_WAYPOINTS = false;
 float OPT_X=-1,OPT_Y=-1;
 float PREV_OPT_X=-1,PREV_OPT_Y=-1;
 float PREV_X = -1;
@@ -73,7 +73,9 @@ float COOLDOWN = 0;
 boolean USE_FIRST_HEURISTIC = false;
 
 
-boolean BUGNAV_ONE = true;
+//use this for toggling different heuristics
+boolean TANGENT_BUG = true;
+boolean BUGNAV_ONE = false;
 boolean BUGNAV_TWO = false;
 
 public void setup(){
@@ -81,6 +83,7 @@ public void setup(){
   frameRate(20);
   //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
   bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
+  tbg = new TangentBug(120, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
   String[] r = loadStrings("controlPoints.txt");
   if(!SET_OF_WAYPOINTS){
     controlPoints = createWriter("controlPoints.txt");
@@ -125,6 +128,7 @@ public boolean path_planning_two(Bug bg){
   for(Location l : bad_places){
     ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
   }
+  
   stroke(255);
   noFill();
   ellipse(bg.current_loc.x,bg.current_loc.y,bg.sensing_radius,bg.sensing_radius);
@@ -309,8 +313,13 @@ boolean is_reversed(float OPT_X, float OPT_Y, float PREV_OPT_X, float PREV_OPT_Y
 
 public void draw(){
    //path_planning_one();
-   
-     if(BUGNAV_ONE){  
+   //if(!draw_obstacle){
+     if(TANGENT_BUG){
+       if(!SET_OF_WAYPOINTS){
+         //println("TANGENT PATHING");
+         tbg.tangent_bug_path_planning();
+       }
+     } else if(BUGNAV_ONE){  
        if(!SET_OF_WAYPOINTS){
          path_planning_one();
        }
@@ -325,13 +334,15 @@ public void draw(){
      if(SET_OF_WAYPOINTS){
        mr.iterate_profiles();
      }
+   //}
    //path_planning_two();
-}
 
+}
 public void mouseDragged(){
   if(draw_obstacle){
     println(mouseX + " " + mouseY);
     bad_places.add(new Location( (int)(mouseX), (int)(mouseY)));
+    tbg.setObstacles(bad_places);
   }
 }
 
@@ -339,7 +350,6 @@ public void keyPressed(){
   if(key==BACKSPACE){
     println("Pressed!");
     draw_obstacle=false;
-    
-    //path_planning_one();
+    tbg.compute_inaccessible_angles();
   }
 }
