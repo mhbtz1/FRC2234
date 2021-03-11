@@ -18,13 +18,28 @@ class TangentBug extends Bug{
     this.obstacles = obstacles;
   }
   
+  //for the emergent boundary following behavior and to prevent from entering an obstacle,
+  //we need to know the corresponding obstacle point that our point robot is closest to
+  public float give_corresponding_obstacle(){
+    float idx = -1;
+    float minh = 1000000009;
+    for(int i = 0; i < obstacles.size(); i++){
+      Location l = obstacles.get(i);
+      minh = min(minh, dist(l.x,l.y,this.current_loc.x,this.current_loc.y));
+      if(minh==dist(l.x,l.y,this.current_loc.x,this.current_loc.y)){
+        idx = i;
+      }
+    }
+    return idx;
+  }
+  
   public void compute_inaccessible_angles(){
     Location dft = obstacles.get(0);
     float DEG2RAD= (float)(180)/(float)(PI);
     for(int i = 1; i < obstacles.size()-1; i++){
       float ang1 = atan( (float)(obstacles.get(i).y-dft.y)/(float)(obstacles.get(i).x-dft.x) ) * DEG2RAD;
       float ang2 = atan( (float)(obstacles.get(i+1).y-obstacles.get(i).y)/(float)(obstacles.get(i+1).x-obstacles.get(i).x) ) * DEG2RAD;
-       inaccessible_angles.put(i,new Location(ang1,ang2));
+       inaccessible_angles.put(i,new Location(min(ang1,ang2),max(ang1,ang2)));
        println("ANGLE ONE: " + ang1 +  " : " + " ANGLE TWO: " + ang2);
     }
   }
@@ -50,7 +65,7 @@ class TangentBug extends Bug{
   
   
   //returns angle values representing the points at which an obstacle is hit by some casted line (uses binary search + an angular sweep)
-  
+  //never mind this doesnt work 
   
   
   public float does_hit(float angle){
@@ -72,21 +87,34 @@ class TangentBug extends Bug{
   }
   
   public ArrayList<PVector> angular_sweep(float DIV){
+    float obs = give_corresponding_obstacle();
+    println("OBSTACLE POSITION: " + obs);
+    Location angpair = new Location(0, 2 * PI);
+    if(obs != -1){
+      angpair = inaccessible_angles.get(obs);
+    }
+    
     ArrayList<PVector> tmp = new ArrayList<PVector>();
     for(float i = 0; i < 2 * PI; i += 0.02){
+      if(i >= angpair.x && i <= angpair.y){continue;}
       float sx = this.current_loc.x + ( ((this.sensing_radius/DIV)-SHIFT_FAC) * cos(i));
       float sy = this.current_loc.y + ( ((this.sensing_radius/DIV)-SHIFT_FAC) * sin(i));
-      //stroke(0,255,0);
-      //line(this.current_loc.x,this.current_loc.y,sx,sy);
-      //stroke(0,0,0);
       tmp.add(new PVector(i,does_hit(i)));
     }
     return tmp;
   }
   //returns a PVector representing <the angle at which the minima was found, the minima>
   public PVector final_angular_sweep(){
+    float obs = give_corresponding_obstacle();
+    println("OBSTACLE POSITION: " + obs);
+    Location angpair = new Location(0, 2 * PI);
+    if(obs != -1){
+      angpair = inaccessible_angles.get(obs);
+    }
+    
     PVector opt = new PVector(100000008, -1);
     for(float i = 0; i < 2 * PI; i += 0.02){
+      if(i >= angpair.x && i <= angpair.y){continue;}
       float eins = leave_heuristic(i,12);
       if( min(opt.x, eins) == eins){
         opt.x = eins;
@@ -122,6 +150,9 @@ class TangentBug extends Bug{
   }
      //first idea: there is an emergent boundary following behavior with minimizing d(x,o) + d(o,g) 
     public void tangent_bug_path_planning(){
+      if(this.obstacles.size() > 0){
+        compute_inaccessible_angles();
+      }
        for(Location l : obstacles){
              fill(0,0,0);
              ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
@@ -164,7 +195,6 @@ class TangentBug extends Bug{
                   float dist = dist(this.current_loc.x, this.current_loc.y, p1,p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
                   if(CURRENT_POINT_NAVIGATED_TO != null && this.current_loc.equals(CURRENT_POINT_NAVIGATED_TO)){
                     tbg.past_places.add(CURRENT_POINT_NAVIGATED_TO);
-                    //println("REACHED!");
                     CURRENT_POINT_NAVIGATED_TO=null;
                   }
                   if(tbg.isContained(new Location(p1,p2))){
@@ -189,11 +219,11 @@ class TangentBug extends Bug{
              //opt_ang = param.y;
            }
            prev_opt_ang = opt_ang;
-           println("OPTIMAL ANGLE: " + opt_ang);
+           //println("OPTIMAL ANGLE: " + opt_ang);
            this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(opt_ang),this.sensing_radius * 0.05 * sin(opt_ang)));
         } else {
           this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(prev_opt_ang), this.sensing_radius * 0.05 * sin(prev_opt_ang)));
-          println("OPTIMAL ANGLE: " + prev_opt_ang);
+          //println("OPTIMAL ANGLE: " + prev_opt_ang);
         }
       } 
       
