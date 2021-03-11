@@ -9,16 +9,32 @@ class TangentBug extends Bug{
   public static final float SHIFT_FAC = 0;
   public static final float DISTANCE_FOR_EQUALITY = 2;
   public static final float OPTIMIZER_FROM_PREV_BUG = 20;
+  //for each obstacle in the obstacle list, we need to represent a pair of angles
+  //which shows the angles for which the robot is looking to the interior
+  public HashMap<Integer,Location> inaccessible_angles;
+  
+  
+  public void setObstacles(ArrayList<Location> obstacles){
+    this.obstacles = obstacles;
+  }
+  
+  public void compute_inaccessible_angles(){
+    Location dft = obstacles.get(0);
+    float DEG2RAD= (float)(180)/(float)(PI);
+    for(int i = 1; i < obstacles.size()-1; i++){
+      float ang1 = atan( (float)(obstacles.get(i).y-dft.y)/(float)(obstacles.get(i).x-dft.x) ) * DEG2RAD;
+      float ang2 = atan( (float)(obstacles.get(i+1).y-obstacles.get(i).y)/(float)(obstacles.get(i+1).x-obstacles.get(i).x) ) * DEG2RAD;
+       inaccessible_angles.put(i,new Location(ang1,ang2));
+       println("ANGLE ONE: " + ang1 +  " : " + " ANGLE TWO: " + ang2);
+    }
+  }
   
   ArrayList<Location> highlight_obstacles = new ArrayList<Location>();
   public TangentBug(float sensing_radius, ArrayList<Location> past_places, Location current_loc, Location goal_loc){
     super(sensing_radius,past_places,current_loc,goal_loc);
     obstacles = new ArrayList<Location>();
+    inaccessible_angles = new HashMap<Integer,Location>();
     //controlPoints = createWriter("controlPoints.txt");
-  }
-  
-  public void setObstacles(ArrayList<Location> obstacles){
-    this.obstacles = obstacles;
   }
   
   //ISSUE: point robot tends to get inside obstacles without realizing so, because the algorithm I am implementing specifies the BOUNDS of obstacles, not each point
@@ -46,7 +62,7 @@ class TangentBug extends Bug{
      float nx = this.current_loc.x + (((this.sensing_radius/2) ) * i * cos(angle));
      float ny = this.current_loc.y + (((this.sensing_radius/2) ) * i * sin(angle));
      for(Location l : obstacles){
-       if(dist(l.x,l.y,nx,ny)<=DISTANCE_FOR_EQUALITY){
+       if(l.equals(new Location(nx,ny))){
          highlight_obstacles.add(l);
          ret=i;
        }
@@ -71,7 +87,7 @@ class TangentBug extends Bug{
   public PVector final_angular_sweep(){
     PVector opt = new PVector(100000008, -1);
     for(float i = 0; i < 2 * PI; i += 0.02){
-      float eins = leave_heuristic(i,40);
+      float eins = leave_heuristic(i,12);
       if( min(opt.x, eins) == eins){
         opt.x = eins;
         opt.y = i;
@@ -89,7 +105,7 @@ class TangentBug extends Bug{
     stroke(0,0,0);
     float p1 = this.current_loc.x + ( (this.sensing_radius/DIV) * v1 * cos(angle) );
     float p2 = this.current_loc.y + ( (this.sensing_radius/DIV) * v1 * sin(angle) );
-    if(does_hit(angle)==1){
+    if(does_hit(angle)>=0.95){
       return dist(this.current_loc.x,this.current_loc.y, p1, p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
     } else {
       return 1000000009;
@@ -107,13 +123,8 @@ class TangentBug extends Bug{
      //first idea: there is an emergent boundary following behavior with minimizing d(x,o) + d(o,g) 
     public void tangent_bug_path_planning(){
        for(Location l : obstacles){
-           //if(contains(highlight_obstacles,l)){
-             //fill(0,255,0);
-             //ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
-           //} else {
              fill(0,0,0);
              ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
-           //}
        }
        highlight_obstacles.clear();
       stroke(0);
@@ -153,7 +164,7 @@ class TangentBug extends Bug{
                   float dist = dist(this.current_loc.x, this.current_loc.y, p1,p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
                   if(CURRENT_POINT_NAVIGATED_TO != null && this.current_loc.equals(CURRENT_POINT_NAVIGATED_TO)){
                     tbg.past_places.add(CURRENT_POINT_NAVIGATED_TO);
-                    println("REACHED!");
+                    //println("REACHED!");
                     CURRENT_POINT_NAVIGATED_TO=null;
                   }
                   if(tbg.isContained(new Location(p1,p2))){
@@ -179,9 +190,9 @@ class TangentBug extends Bug{
            }
            prev_opt_ang = opt_ang;
            println("OPTIMAL ANGLE: " + opt_ang);
-           this.updateLocation(new PVector(this.sensing_radius * 0.025 * cos(opt_ang),this.sensing_radius * 0.025 * sin(opt_ang)));
+           this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(opt_ang),this.sensing_radius * 0.05 * sin(opt_ang)));
         } else {
-          this.updateLocation(new PVector(this.sensing_radius * 0.025 * cos(prev_opt_ang), this.sensing_radius * 0.025 * sin(prev_opt_ang)));
+          this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(prev_opt_ang), this.sensing_radius * 0.05 * sin(prev_opt_ang)));
           println("OPTIMAL ANGLE: " + prev_opt_ang);
         }
       } 
