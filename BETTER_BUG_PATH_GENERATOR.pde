@@ -62,7 +62,7 @@ class TangentBug extends Bug{
      float nx = this.current_loc.x + (((this.sensing_radius/2) ) * i * cos(angle));
      float ny = this.current_loc.y + (((this.sensing_radius/2) ) * i * sin(angle));
      for(Location l : obstacles){
-       if(l.equals(new Location(nx,ny))){
+       if(dist(l.x,l.y,nx,ny) < DISTANCE_FOR_EQUALITY ){
          highlight_obstacles.add(l);
          ret=i;
        }
@@ -103,8 +103,8 @@ class TangentBug extends Bug{
     noFill();
     ellipse(this.current_loc.x,this.current_loc.y,2*this.sensing_radius/DIV,2*this.sensing_radius/DIV);
     stroke(0,0,0);
-    float p1 = this.current_loc.x + ( (this.sensing_radius/DIV) * v1 * cos(angle) );
-    float p2 = this.current_loc.y + ( (this.sensing_radius/DIV) * v1 * sin(angle) );
+    float p1 = this.current_loc.x + ( 2 * (this.sensing_radius/DIV) * v1 * cos(angle) );
+    float p2 = this.current_loc.y + ( 2 * (this.sensing_radius/DIV) * v1 * sin(angle) );
     if(does_hit(angle)>=0.95){
       return dist(this.current_loc.x,this.current_loc.y, p1, p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
     } else {
