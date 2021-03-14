@@ -44,6 +44,7 @@ public class Profile {
         this.MY_CURRENT_POSITION = new Location(200,300);
     }
     //assume that the time over wich velocity/acceleration changes is 1 unit
+    //TODO: Implement trapezoidal motion profiling; should make movements smoother
     public void constructVelocityMap(){
         System.out.println("PATH SIZE: " + true_waypoints.size());
         //PREDICATED ON SOME SEED STARTING POSITION
