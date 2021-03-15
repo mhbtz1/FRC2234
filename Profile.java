@@ -58,6 +58,10 @@ public class Profile {
             cur_pos= true_waypoints.get(i);
         }
     }
+    
+    public void constructTrapezoidalVelocityProfile(){
+        
+    }
     public boolean loc_contains(ArrayList<Location> targ, Location tst){
         for(Location l : targ){
           if(l.equals(tst)){
