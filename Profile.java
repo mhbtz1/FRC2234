@@ -7,6 +7,7 @@ import edu.wpi.first.wpilibj.*;
 //for the sake of this, assume that path will be precomputed by some separate process
 //(translate processing code onto here)
 public class Profile {
+    public HashMap<Integer, TrapezoidalProfile> bezier_velocity;
     public HashMap<Integer, Location> velocity_profile;
     public HashMap<Integer, Location> acceleration_profile;
     public HashMap<Integer, Double> angle_profile;
@@ -21,6 +22,7 @@ public class Profile {
     public static final double ANGLE_SHIFTING_FACTOR = 0;
     public Profile(ArrayList<Location> path){
         this.path = path;
+        bezier_velocity = new HashMap<Integer, TrapezoidalProfile>();
         velocity_profile = new HashMap<Integer, Location>();
         acceleration_profile = new HashMap<Integer, Location>();
         angle_profile = new HashMap<Integer, Double>();
@@ -31,6 +33,7 @@ public class Profile {
         ANGLE_FILE_HAS_BEEN_INITIALIZED = false;
     }
     public Profile(){
+        bezier_velocity = new HashMap<Integer, TrapezoidalProfile>();
         velocity_profile = new HashMap<Integer, Location>();
         acceleration_profile = new HashMap<Integer, Location>();
         angle_profile = new HashMap<Integer, Double>();
@@ -48,7 +51,7 @@ public class Profile {
     public void constructVelocityMap(){
         System.out.println("PATH SIZE: " + true_waypoints.size());
         //PREDICATED ON SOME SEED STARTING POSITION
-        Location cur_pos= new Location(200,200);
+        Location cur_pos= new Location(200,300);
         for(int i = 0; i < true_waypoints.size(); i++){
             Location vel = true_waypoints.get(i).subtract(cur_pos);
             vel.x /= 6;
@@ -59,8 +62,18 @@ public class Profile {
         }
     }
     
-    public void constructTrapezoidalVelocityProfile(){
-        
+    public void constructTrapezoidalVelocityMap(){
+        Location cur_pos= new Location(200,300);
+        for(int i = 0; i < true_waypoints.size(); i++){
+            Location vel = true_waypoints.get(i).subtract(cur_pos);
+            TrapezoidalProfile t = new TrapezoidalProfile(cur_pos,true_waypoints.get(i),6);
+            vel.x /= 6;
+            vel.y /= 6;
+            t.instantiate_speeds();
+            bezier_velocity.put(i,t);
+            System.out.println("WAYPOINT INDEX: " + i  + "PROFILE SIZE: " + t.parametrized_speeds.size());
+            cur_pos= true_waypoints.get(i);
+        }
     }
     public boolean loc_contains(ArrayList<Location> targ, Location tst){
         for(Location l : targ){
@@ -103,7 +116,7 @@ public class Profile {
         //if(waypoints.size() == 0){
           waypoints = parseFile();
           System.out.println("SIZE: " + waypoints.size());
-          int ITER = 200;
+          int ITER = 190;
           for(int i = 0; i < waypoints.size()-ITER; i+= ITER){
               //println(waypoints.get(i).x + " " + waypoints.get(i).y);
               BezierProfile b = new BezierProfile(waypoints.get(i).x,waypoints.get(i).y,waypoints.get(i+ITER/4).x,waypoints.get(i+ITER/4).y,waypoints.get(i+ITER/2).x,waypoints.get(i+ITER/2).y,waypoints.get(i+ITER).x,waypoints.get(i+ITER).y);
@@ -119,7 +132,7 @@ public class Profile {
         }
 
         constructAngleMap();
-        constructVelocityMap();
+        constructTrapezoidalVelocityMap();
         ANGLE_FILE_HAS_BEEN_INITIALIZED=true;
     }
 
@@ -175,5 +188,4 @@ public class Profile {
     }
     
 }
-
 
