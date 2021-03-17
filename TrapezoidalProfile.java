@@ -12,19 +12,19 @@ public class TrapezoidalProfile{
     double MAX_VEL;
     double TIME_DISP;
     double distance;
-    double EPS = 0.01;
+    double EPS = 0.04;
     double MULT = 1.2;
     public TrapezoidalProfile(Location ax, Location by, double TIME_DISP){
         this.start = ax;
         this.end= by;
+        this.distance = Location.distance(ax,by);
+        this.TIME_DISP = TIME_DISP;
         this.MAX_VEL = 1.5 * (this.distance/(double)this.TIME_DISP);
         this.inter0 = new Location(0,0);
         this.inter1 = new Location(this.TIME_DISP/(double)(3), this.MAX_VEL);
         this.inter2 = new Location(2 * this.TIME_DISP/(double)(3), this.MAX_VEL);
         this.inter3 = new Location(this.TIME_DISP, 0);
-        this.distance = Location.distance(ax,by);
         this.parametrized_speeds = new ArrayList<Location>();
-        this.TIME_DISP = TIME_DISP;
         this.b = new BezierProfile(inter0.x,inter0.y,inter1.x,inter1.y,inter2.x,inter2.y,inter3.x,inter3.y);
     }
     public void instantiate_speeds(){
