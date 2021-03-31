@@ -50,8 +50,10 @@ class IDA{
     }
     
     public ArrayList<Integer> backtrack(int end){
+      println("START BACKTRACKING");
       ArrayList<Integer> res = new ArrayList<Integer>();
       while(true){
+        println("CURRENT POSITION: " + end);
         res.add(end);
         if(!parent_pointers.containsKey(end)){break;}
         end= parent_pointers.get(end);
@@ -76,13 +78,13 @@ class IDA{
         println("POINT: " + tp.x + " " + tp.y);
         for(int idx = 0; idx < dx.length; idx++){
           Location nxt = new Location(tp.x+dx[idx],tp.y+dy[idx]);
-          if(parent_pointers.containsKey(nxt)){
+          if(parent_pointers.containsKey(hashCode(nxt.x,nxt.y))){
             continue;
           }
-          if(optimized_impasse.containsKey(nxt)){
+          if(optimized_impasse.containsKey(hashCode(nxt.x,nxt.y))){
             continue;
           }
-            parent_pointers.put(hashCode(nxt.x,nxt.y),hashCode(tp.x,tp.y));
+            parent_pointers.put(hashCode(tp.x,nxt.y),hashCode(tp.x,tp.y));
             println("ADD: " + nxt.x + " " + nxt.y);
             seen.add(nxt);
             q.add(nxt);
