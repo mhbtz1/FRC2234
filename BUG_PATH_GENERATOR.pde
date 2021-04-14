@@ -312,6 +312,13 @@ boolean is_reversed(float OPT_X, float OPT_Y, float PREV_OPT_X, float PREV_OPT_Y
 }
 
 public void draw(){
+
+    if(!myRRT.rrtExploration()){
+      myRRT.displayRRT(myRRT.seed);
+      myRRT.reset();
+    }
+     
+
    //path_planning_one();
    //if(!draw_obstacle){
      if(TANGENT_BUG){
