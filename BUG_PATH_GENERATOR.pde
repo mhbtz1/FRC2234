@@ -316,8 +316,9 @@ public void draw(){
     if(!myRRT.rrtExploration()){
       myRRT.displayRRT(myRRT.seed);
       myRRT.reset();
+      ida = new IDA(myRRT.graph, current_loc, goal_loc);
+      //ida.IDA();
     }
-     
 
    //path_planning_one();
    //if(!draw_obstacle){
