@@ -1,239 +1,384 @@
+//bug pathfinding algorithm presentation:
+//https://spacecraft.ssl.umd.edu/academics/788XF14/788XF14L14/788XF14L14.pathbugsmapsx.pdf
 
-class TangentBug extends Bug{
-  ArrayList<Location> obstacles;
-  float OPTIM_FACTOR = 3.2;
-  //information to know when bug is navigating: the point it is navigating to, and the dist(x, nav) + dist(nav, goal)
-  Location CURRENT_POINT_NAVIGATED_TO = null;
-  float CURRENT_DIST = 1000000009;
-  //some constants
-  public static final float SHIFT_FAC = 0;
-  public static final float DISTANCE_FOR_EQUALITY = 2;
-  public static final float OPTIMIZER_FROM_PREV_BUG = 20;
-  //for each obstacle in the obstacle list, we need to represent a pair of angles
-  //which shows the angles for which the robot is looking to the interior
-  public HashMap<Integer,Location> inaccessible_angles;
-  
-  
-  public void setObstacles(ArrayList<Location> obstacles){
-    this.obstacles = obstacles;
-  }
-  
-  //for the emergent boundary following behavior and to prevent from entering an obstacle,
-  //we need to know the corresponding obstacle point that our point robot is closest to
-  public float give_corresponding_obstacle(){
-    float idx = -1;
-    float minh = 1000000009;
-    for(int i = 0; i < obstacles.size(); i++){
-      Location l = obstacles.get(i);
-      minh = min(minh, dist(l.x,l.y,this.current_loc.x,this.current_loc.y));
-      if(minh==dist(l.x,l.y,this.current_loc.x,this.current_loc.y)){
-        idx = i;
-      }
-    }
-    return idx;
-  }
-  
-  public void compute_inaccessible_angles(){
-    Location dft = obstacles.get(0);
-    float DEG2RAD= (float)(180)/(float)(PI);
-    for(int i = 1; i < obstacles.size()-1; i++){
-      float ang1 = atan( (float)(obstacles.get(i).y-dft.y)/(float)(obstacles.get(i).x-dft.x) ) * DEG2RAD;
-      float ang2 = atan( (float)(obstacles.get(i+1).y-obstacles.get(i).y)/(float)(obstacles.get(i+1).x-obstacles.get(i).x) ) * DEG2RAD;
-       inaccessible_angles.put(i,new Location(min(ang1,ang2),max(ang1,ang2)));
-       println("ANGLE ONE: " + ang1 +  " : " + " ANGLE TWO: " + ang2);
-    }
-  }
-  
-  ArrayList<Location> highlight_obstacles = new ArrayList<Location>();
-  public TangentBug(float sensing_radius, ArrayList<Location> past_places, Location current_loc, Location goal_loc){
-    super(sensing_radius,past_places,current_loc,goal_loc);
-    obstacles = new ArrayList<Location>();
-    inaccessible_angles = new HashMap<Integer,Location>();
-    //controlPoints = createWriter("controlPoints.txt");
-  }
-  
-  //ISSUE: point robot tends to get inside obstacles without realizing so, because the algorithm I am implementing specifies the BOUNDS of obstacles, not each point
-  //fix: the closer a point is to some obstacle point, we'll just add some repellent force to prohibit it from entering the obstacle (the effects of this should go away with the sampling + Bezier curves)
-  
-  public float repellentHeuristic(){
-   float CLOSEST_DIST = 1000000000;
-   for(Location l : obstacles){
-     CLOSEST_DIST = min(CLOSEST_DIST,dist(this.current_loc.x,this.current_loc.y,l.x,l.y)+dist(l.x,l.y,this.goal_loc.x,this.goal_loc.y));
-   }
-    return 0.0;
-  }
-  
-  
-  //returns angle values representing the points at which an obstacle is hit by some casted line (uses binary search + an angular sweep)
-  //never mind this doesnt work 
-  
-  
-  public float does_hit(float angle){
-    //perform a binary search along the line for the point at which the raycasted line (would potentially) hit the edge of some obsacle
-    //probably not as optimal as it could be, but good enough
-    float INC_FACTOR = 0.05;
-    float ret = 1;
-   for(float i = 0; i <= 1; i += INC_FACTOR){
-     float nx = this.current_loc.x + (((this.sensing_radius/2) ) * i * cos(angle));
-     float ny = this.current_loc.y + (((this.sensing_radius/2) ) * i * sin(angle));
-     for(Location l : obstacles){
-       if(dist(l.x,l.y,nx,ny) < DISTANCE_FOR_EQUALITY ){
-         highlight_obstacles.add(l);
-         ret=i;
-       }
-     }
-   }
-    return ret;
-  }
-  
-  public ArrayList<PVector> angular_sweep(float DIV){
-    float obs = give_corresponding_obstacle();
-    println("OBSTACLE POSITION: " + obs);
-    Location angpair = new Location(0, 2 * PI);
-    if(obs != -1){
-      angpair = inaccessible_angles.get(obs);
-    }
-    
-    ArrayList<PVector> tmp = new ArrayList<PVector>();
-    for(float i = 0; i < 2 * PI; i += 0.02){
-      if(i >= angpair.x && i <= angpair.y){continue;}
-      float sx = this.current_loc.x + ( ((this.sensing_radius/DIV)-SHIFT_FAC) * cos(i));
-      float sy = this.current_loc.y + ( ((this.sensing_radius/DIV)-SHIFT_FAC) * sin(i));
-      tmp.add(new PVector(i,does_hit(i)));
-    }
-    return tmp;
-  }
-  //returns a PVector representing <the angle at which the minima was found, the minima>
-  public PVector final_angular_sweep(){
-    float obs = give_corresponding_obstacle();
-    println("OBSTACLE POSITION: " + obs);
-    Location angpair = new Location(0, 2 * PI);
-    if(obs != -1){
-      angpair = inaccessible_angles.get(obs);
-    }
-    
-    PVector opt = new PVector(100000008, -1);
-    for(float i = 0; i < 2 * PI; i += 0.02){
-      if(i >= angpair.x && i <= angpair.y){continue;}
-      float eins = leave_heuristic(i,12);
-      if( min(opt.x, eins) == eins){
-        opt.x = eins;
-        opt.y = i;
-      }
-    }
-    return opt;
-  }
-  
+import java.util.*;
 
-  public float leave_heuristic(float angle, float DIV){
-    float v1 = does_hit(angle);
-    stroke(0,0,255);
-    noFill();
-    ellipse(this.current_loc.x,this.current_loc.y,2*this.sensing_radius/DIV,2*this.sensing_radius/DIV);
-    stroke(0,0,0);
-    float p1 = this.current_loc.x + ( 2 * (this.sensing_radius/DIV) * v1 * cos(angle) );
-    float p2 = this.current_loc.y + ( 2 * (this.sensing_radius/DIV) * v1 * sin(angle) );
-    if(does_hit(angle)>=0.95){
-      return dist(this.current_loc.x,this.current_loc.y, p1, p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
-    } else {
-      return 1000000009;
-    }
+//WLOG we will assume our bugs position (x,y)  <= our goal position (gx, gy), since we can consider our bug starting at the goal position and navigating to its "initial" position, in thtat case
+
+class Bug{
+  float sensing_radius;
+  float original_radius;
+  boolean MODULATE_RADIUS;
+  ArrayList<Location> past_places = new ArrayList<Location>();
+  ArrayList<Location> heuristic_path = new ArrayList<Location>();
+  ArrayList<Location> obstacle_seen = new ArrayList<Location>();
+  ArrayList<Integer> known_displacements = new ArrayList<Integer>();
+  Location current_loc;
+  Location goal_loc;
+  public Bug(){
+    
   }
-  
-  public boolean contains(ArrayList<Location> m, Location n){
-    for(Location l : m){
-      if(l.equals(n)){
+  public Bug(float sensing_radius, ArrayList<Location> past_places, Location current_loc, Location goal_loc){
+    this.sensing_radius = sensing_radius;
+    this.past_places = past_places;
+    this.current_loc = current_loc;
+    this.goal_loc = goal_loc;
+    this.MODULATE_RADIUS=false;
+    this.original_radius = sensing_radius;
+    known_displacements = new ArrayList<Integer>();
+  }
+  public boolean isContained(Location match){
+    for(Location l : past_places){
+      if(l.equals(match)){
         return true;
       }
     }
     return false;
   }
-     //first idea: there is an emergent boundary following behavior with minimizing d(x,o) + d(o,g) 
-    public void tangent_bug_path_planning(){
-      if(this.obstacles.size() > 0){
-        compute_inaccessible_angles();
-      }
-       for(Location l : obstacles){
-             fill(0,0,0);
-             ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
-       }
-       highlight_obstacles.clear();
-      stroke(0);
-      noFill();
-      ellipse(this.current_loc.x,this.current_loc.y,this.sensing_radius,this.sensing_radius);
-      fill(255,0,0);
-      noStroke();
-      ellipse(this.current_loc.x, this.current_loc.y, 8, 8);
-      fill(0,255,0);
-      ellipse(this.goal_loc.x,this.goal_loc.y,8,8);
-      fill(255);
-      boolean b = abs(this.current_loc.x-this.goal_loc.x)<=5 && abs(this.current_loc.y-this.goal_loc.y)<=5;
-      //println("TANGENT BUG ALGORITHM");
-     
-      if(!b && !draw_obstacle){
-        controlPoints.println(bg.current_loc.x + ":" + bg.current_loc.y);
-        //tbg.past_places.add(tbg.current_loc);
-        float FAILSAFE = atan((this.goal_loc.y-this.current_loc.y)/(this.goal_loc.x-this.current_loc.x));
-        float prev_opt_ang = atan((this.goal_loc.y-this.current_loc.y)/(this.goal_loc.x-this.current_loc.x));
-        ArrayList<PVector> valid_angles = angular_sweep(2);
-        controlPoints.println(this.current_loc.x+":"+this.current_loc.y);
-        if(valid_angles.size() != 0){
-          float relax_dist = 1000000000;
-          if(CURRENT_POINT_NAVIGATED_TO != null){
-            //relax_dist = dist(this.current_loc.x,this.current_loc.y,CURRENT_POINT_NAVIGATED_TO.x,CURRENT_POINT_NAVIGATED_TO.y)+dist(CURRENT_POINT_NAVIGATED_TO.x,CURRENT_POINT_NAVIGATED_TO.y,this.goal_loc.x,this.goal_loc.y);
-          } 
-           float SHIFT_SPACE = (float)(PI)/(float)(2);
-           float opt_ang = prev_opt_ang;
-           for(PVector info : valid_angles){
-               float ag = (info.x) * (float)(180)/(float)(PI);
-               //println("POTENTIAL ANGLE: " + ag);
-                if(info.y >= 0.95 || info.y <= 0.15){
-                  continue;
-                } else {
-                  float p1 = this.current_loc.x + (info.y * cos(info.x) * ((this.sensing_radius/2)-SHIFT_FAC) );
-                  float p2 = this.current_loc.y + (info.y * sin(info.x) * ((this.sensing_radius/2)-SHIFT_FAC) );
-                  float dist = dist(this.current_loc.x, this.current_loc.y, p1,p2) + dist(p1,p2,this.goal_loc.x,this.goal_loc.y);
-                  if(CURRENT_POINT_NAVIGATED_TO != null && this.current_loc.equals(CURRENT_POINT_NAVIGATED_TO)){
-                    tbg.past_places.add(CURRENT_POINT_NAVIGATED_TO);
-                    CURRENT_POINT_NAVIGATED_TO=null;
-                  }
-                  if(tbg.isContained(new Location(p1,p2))){
-                    continue;
-                  }
-                  if(min(dist,relax_dist)==dist){
-                    relax_dist = dist;
-                    opt_ang = info.x;
-                    this.CURRENT_POINT_NAVIGATED_TO = new Location(p1,p2);
-                    CURRENT_DIST = dist(this.current_loc.x,this.current_loc.y,CURRENT_POINT_NAVIGATED_TO.x,CURRENT_POINT_NAVIGATED_TO.y)+dist(CURRENT_POINT_NAVIGATED_TO.x,CURRENT_POINT_NAVIGATED_TO.y,this.goal_loc.x,this.goal_loc.y);
-                  }
-                }
-           }
-           if(CURRENT_POINT_NAVIGATED_TO != null){
-             fill(0,255,255);
-             ellipse(CURRENT_POINT_NAVIGATED_TO.x,CURRENT_POINT_NAVIGATED_TO.y,8,8);
-           }
-           println("--------------------------------------------------------");
-           //check the case where some point in your sensing space is closer to the goal than the chosen CURRENT_POINT_NAVIGATED_TO
-           PVector param = final_angular_sweep();
-           if(min(relax_dist, param.x)==param.x){
-             //opt_ang = param.y;
-           }
-           prev_opt_ang = opt_ang;
-           //println("OPTIMAL ANGLE: " + opt_ang);
-           this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(opt_ang),this.sensing_radius * 0.05 * sin(opt_ang)));
-        } else {
-          this.updateLocation(new PVector(this.sensing_radius * 0.05 * cos(prev_opt_ang), this.sensing_radius * 0.05 * sin(prev_opt_ang)));
-          //println("OPTIMAL ANGLE: " + prev_opt_ang);
-        }
-      } 
-      
-      if(b){
-        SET_OF_WAYPOINTS=true;
-        println("TANGENT BUG HAS FOUND ENDPOINT!");
-      }
-      
-      
-      
+  public boolean detReseed(int WINDOW_SIZE){
+    float mdiff = 0;
+    if(WINDOW_SIZE >= past_places.size()){
+      return false;
     }
+    Location one = bg.past_places.get(bg.past_places.size() - WINDOW_SIZE);
+    Location two = bg.past_places.get(WINDOW_SIZE - 1);
+    return dist(one.x,one.y,two.x,two.y) <= 2.5;
+  }
+  public void updateLocation(PVector v){
+    this.current_loc.x+=v.x;
+    this.current_loc.y+=v.y;
+  }
+}
+
+
+//we will simply draw shapes into the map to give us the obstacles in the space.
+Bug bg;
+TangentBug tbg;
+MotionProfiler mr;
+IDA ida;
+RRT myRRT;
+//Perfect_Preprocessing prcs;
+PrintWriter controlPoints;
+static final int CIRC_RADIUS = 8;
+ArrayList<Location> bad_places = new ArrayList<Location>();
+Location current_loc = new Location(200,300);
+Location goal_loc = new Location(800,400);
+boolean draw_obstacle = true;
+boolean SET_OF_WAYPOINTS = false;
+float OPT_X=-1,OPT_Y=-1;
+float PREV_OPT_X=-1,PREV_OPT_Y=-1;
+float PREV_X = -1;
+float PREV_Y = -1;
+float LET_IT_RUN = 15;//if we encounter a glitch where we reach the end of an obstacle, we run the more primitive bugnav algo for some number of iterations
+boolean INITIATE_COOLDOWN = false;
+float COOLDOWN = 0;
+boolean USE_FIRST_HEURISTIC = false;
+
+
+//use this for toggling different heuristics
+boolean TANGENT_BUG = true;
+boolean BUGNAV_ONE = false;
+boolean BUGNAV_TWO = false;
+boolean TEST_BEZIER_CURVE = false;
+boolean TEST_RRT = false;
+
+public void setup(){
+  size(1400,1400);
+  frameRate(20);
+  tbez = new BezierProfile(0,0,120,120,240,120,360,0);
+  gen_waypoints();
+  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 1000);
+  
+  //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
+  bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
+  tbg = new TangentBug(120, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
+  
+  //when RRT wor
+
+  String[] r = loadStrings("controlPoints.txt");
+  if(!SET_OF_WAYPOINTS){
+    controlPoints = createWriter("controlPoints.txt");
+  } 
+  mr = new MotionProfiler();
+}
+
+
+
+public float[] change_x = {0.5,0,-0.5,0};
+public float[] change_y = {0,-0.5,0,0.5};
+
+public float intersect_circles(Location one, Location two){
+  return dist(one.x,one.y,two.x,two.y);
+}
+public boolean valid_intersection(Location one, Location two){
+  return intersect_circles(one,two) <= (bg.sensing_radius)/2;
+}
+
+public boolean intersect_obstacle(){
+  float ep = 2.8;
+  for(Location l : bad_places){
+    if(intersect_circles(l,bg.current_loc) <= bg.sensing_radius + CIRC_RADIUS - ep){
+      return true;
+    }
+  }
+  return false;
+}
+
+// the first bug algorithm we have is based on the following idea( and future bug algorithms as well):
+
+//1. we want to take the motion which will let us get close to our goal
+//2. if we find an obstacle, we want to navigate around the obstacle while we still get close to the goal
+//3. straight line paths are always faster than curved paths
+//4. Following along the line that joins point A to point B is always best (bc of triangle inequality), this has not been implemented
+
+
+
+
+public boolean path_planning_two(Bug bg){
+  background(0);
+  for(Location l : bad_places){
+    ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
+  }
+  
+  stroke(255);
+  noFill();
+  ellipse(bg.current_loc.x,bg.current_loc.y,bg.sensing_radius,bg.sensing_radius);
+  fill(255,0,0);
+  noStroke();
+  ellipse(bg.current_loc.x, bg.current_loc.y, 8, 8);
+  fill(0,255,0);
+  ellipse(bg.goal_loc.x,bg.goal_loc.y,8,8);
+  fill(255);
+  boolean condition=bg.current_loc.x == bg.goal_loc.x && bg.current_loc.y == bg.goal_loc.y;
+  float DEFAULT_DIR_X = -0.5 * (float)((bg.current_loc.x-bg.goal_loc.x)/(bg.current_loc.y-bg.goal_loc.y));
+  float DEFAULT_DIR_Y= -0.5;
+  float DIR_X= - 0.5 * (float)((bg.current_loc.x-bg.goal_loc.x)/(bg.current_loc.y-bg.goal_loc.y));
+  float DIR_Y= - 0.5;
+  float new_x = DIR_X + bg.current_loc.x;
+  float new_y = DIR_Y + bg.current_loc.y;
+  if(!condition && !draw_obstacle){
+    float glob_min = 1000000000;
+    for(Location l : bad_places){
+      if(valid_intersection(l,bg.current_loc)){
+        float pot_x = ((float)((bg.current_loc.y-l.y)/(bg.current_loc.x-l.x)));
+        float pot_y = 1;
+        Location rel = new Location(bg.current_loc.x + pot_x, bg.current_loc.y + pot_y);
+        float pot_x_2 = -pot_x;
+        float pot_y_2 = -pot_y;
+        Location rel2 = new Location(bg.current_loc.x + pot_x_2, bg.current_loc.y + pot_y_2);
+        float dist_relax= dist(l.x,l.y,bg.current_loc.x,bg.current_loc.y) + dist(rel.x,rel.y,bg.goal_loc.x,bg.goal_loc.y);
+        float dist_relax_two = dist(l.x,l.y,bg.current_loc.x,bg.current_loc.y) + dist(rel2.x,rel2.y,bg.goal_loc.x,bg.goal_loc.y);
+        glob_min = min(glob_min,dist_relax);
+        glob_min = min(glob_min, dist_relax_two);
+        //slope should be perpendicular to slope between current position and considered obstacle point
+        if(glob_min == dist_relax){
+          DIR_X = pot_x;
+          DIR_Y= pot_y;
+          //DIR_X = ceil(DIR_X);
+        } else if(glob_min == dist_relax_two){
+          DIR_X = pot_x_2;
+          DIR_Y=  pot_y_2;
+          //DIR_X = ceil(DIR_X);
+        }
+      }
+    }
+    
+    println( "POSITION: " + bg.current_loc.x + " " + bg.current_loc.y);
+    
    
+    
+   println( "SLOPE: " + DIR_X + " " + DIR_Y);
+   bg.past_places.add(bg.current_loc);
+   bg.current_loc.x -= DIR_X;
+   bg.current_loc.y -= DIR_Y;
+   bg.known_displacements.add( (int)(max( abs(bg.current_loc.x - PREV_X), abs(bg.current_loc.y - PREV_Y)) ) );
+    PREV_X = bg.current_loc.x;
+    PREV_Y = bg.current_loc.y;
+    bg.heuristic_path.add(bg.current_loc);
+    PREV_OPT_X = DIR_X;
+    PREV_OPT_Y = DIR_Y;
+    DIR_X = DEFAULT_DIR_X;
+    DIR_Y = DEFAULT_DIR_Y;
+    
+    if(bg.goal_loc.x  ==  bg.current_loc.x  && bg.goal_loc.y  == bg.current_loc.y){
+      SET_OF_WAYPOINTS = true;
+    }
+    
+   if(bg.detReseed(50)){
+      return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+public void path_planning_one(){
+  //background(0);
+  for(Location l : bad_places){
+    ellipse(l.x,l.y,CIRC_RADIUS,CIRC_RADIUS);
+  }
+  stroke(255);
+  noFill();
+  ellipse(bg.current_loc.x,bg.current_loc.y,bg.sensing_radius,bg.sensing_radius);
+  fill(255,0,0);
+  noStroke();
+  ellipse(bg.current_loc.x, bg.current_loc.y, 8, 8);
+  fill(0,255,0);
+  ellipse(bg.goal_loc.x,bg.goal_loc.y,8,8);
+  fill(255);
+   boolean condition=bg.current_loc.x == bg.goal_loc.x && bg.current_loc.y == bg.goal_loc.y;
+  if(!condition && !draw_obstacle){
+    controlPoints.println(bg.current_loc.x + ":" + bg.current_loc.y);
+    println("POSITION: " + bg.current_loc.x + " " + bg.current_loc.y);
+    float glob_min = 1000000000;
+    float OPT_X=-1,OPT_Y=-1;
+    float PREV_OPT_X=-1,PREV_OPT_Y=-1;
+    for(int i = 0; i < 4; i++){
+      Location nw = new Location(bg.current_loc.x+change_x[i],bg.current_loc.y+change_y[i]);
+      float tot_dist = dist(bg.current_loc.x+change_x[i], bg.current_loc.y+change_y[i], bg.goal_loc.x, bg.goal_loc.y);
+      if(!intersect_obstacle()){
+          glob_min=min(glob_min,tot_dist);
+          if(glob_min==tot_dist){
+            OPT_X=change_x[i];
+            OPT_Y=change_y[i];
+          }
+      }
+    }
+      
+    
+    if(OPT_X==-1 && OPT_Y==-1){
+      float dist_max = 0;
+      for(Location l : bad_places){
+        for(int i = 0; i < 4; i++){
+          Location loc = new Location(bg.current_loc.x+change_x[i],bg.current_loc.y+change_y[i]);
+          float sav = intersect_circles(l,loc);
+          if(sav <= bg.sensing_radius){
+            dist_max= max(dist_max,sav);
+            float goal_dist = dist(bg.current_loc.x+change_x[i],bg.current_loc.y+change_y[i],bg.goal_loc.x,bg.goal_loc.y);
+            glob_min = min(glob_min, goal_dist);
+            if(dist_max==sav && glob_min==goal_dist){
+              
+              if(bg.isContained(new Location(bg.current_loc.x+change_x[i],bg.current_loc.y+change_y[i]))){
+                continue;
+              }
+              
+              if(is_reversed(OPT_X,OPT_Y,PREV_OPT_X,PREV_OPT_Y)){
+                continue;
+              }
+              
+              OPT_X = change_x[i];
+              OPT_Y = change_y[i];
+           }
+         }
+        }
+      }
+    }
+    
+    
+
+    bg.current_loc.x += OPT_X;
+    bg.current_loc.y += OPT_Y;
+    println("CHOICE: " + OPT_X + " " + OPT_Y);
+   if(bg.isContained(bg.current_loc)){
+         INITIATE_COOLDOWN = true;
+    }
+    
+    
+    //some ugly heuristic stuff
+    if(!INITIATE_COOLDOWN){
+      bg.current_loc.x += OPT_X;
+      bg.current_loc.y += OPT_Y;
+    } else {
+      println("LETTING IT RUN...");
+      if(COOLDOWN < LET_IT_RUN){
+        bg.current_loc.x += 0.5;
+        ++COOLDOWN;
+      } else {
+        println("TERMINATING RUNNING...");
+        INITIATE_COOLDOWN = false;
+        COOLDOWN = 0;
+      }
+    }
+    
+    bg.past_places.add(bg.current_loc);
+    PREV_OPT_X = OPT_X;
+    PREV_OPT_Y = OPT_Y;
+  }
+  
+  if(bg.current_loc.x == bg.goal_loc.x && bg.current_loc.y == bg.goal_loc.y){
+    SET_OF_WAYPOINTS = true;
+  }
+}
+
+boolean is_reversed(float OPT_X, float OPT_Y, float PREV_OPT_X, float PREV_OPT_Y){
+  if(OPT_X != 0){
+    if(OPT_X==PREV_OPT_X*-1){
+      return true;
+    }
+  }
+  if(OPT_Y != 0){
+    if(OPT_Y==PREV_OPT_Y*-1){
+      return true;
+    }
+  }
+  return false;
+}
+
+
+public void draw(){
+   //path_planning_one();
+   //if(!draw_obstacle){
+   background(255);
+    
+    if(!myRRT.rrtExploration()){
+      myRRT.displayRRT(myRRT.seed);
+      myRRT.reset();
+      ida = new IDA(myRRT.graph, current_loc, goal_loc);
+      //ida.IDA();
+    }
+     for(Location l : bad_places){
+        ellipse(l.x,l.y,8,8);
+     }
+     if(TANGENT_BUG){
+       if(!SET_OF_WAYPOINTS){
+         //println("TANGENT PATHING");
+         tbg.tangent_bug_path_planning();
+       }
+     } else if(BUGNAV_ONE){  
+       if(!SET_OF_WAYPOINTS){
+         path_planning_one();
+       }
+     } else if(BUGNAV_TWO){
+       if(!SET_OF_WAYPOINTS){
+         if(!path_planning_two(bg)){
+           bg.current_loc.x += 10;
+        }
+       }
+     }
+     
+     if(SET_OF_WAYPOINTS){
+       mr.iterate_profiles();
+     }
+   //}
+   //path_planning_two();
+}
+
+public void mouseDragged(){
+  if(draw_obstacle){
+    println(mouseX + " " + mouseY);
+    bad_places.add(new Location( (int)(mouseX), (int)(mouseY)));
+    tbg.setObstacles(bad_places);
+  }
+}
+
+public void keyPressed(){
+  if(key==BACKSPACE){
+    println("Pressed!");
+    draw_obstacle=false;
+    //tbg.compute_inaccessible_angles();
+
+    //ida = new IDA(bad_places, new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
+    //ida.BFS();
+    //for(int l : ida.BFS_Path){System.out.println("ENCODED POS: " + l);}
+  }
 }
