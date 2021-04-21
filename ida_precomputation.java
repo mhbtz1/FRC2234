@@ -1,140 +1,215 @@
-//iterative deepening A*
+import java.io.*;
 import java.util.*;
 
-
-
-//the nice thing about using RRTs for making continuous stuff discrete is that the graph structure
-//already encodes the obstacle space for us.
-
-
-
-class IDAComparator implements Comparator<GType>{
-  public int compare(GType one, GType two){
-     if(one.COST_TO_REACH + one.HEURISTIC_COST < two.COST_TO_REACH + two.HEURISTIC_COST){
-       return 1;
-     } else {
-       return 0;
-     }
+PVector COMPARE_POINT;
+class PQComparator implements Comparator<PVector>{
+  public int compare(PVector one, PVector two){
+    if(dist(one.x,one.y,COMPARE_POINT.x,COMPARE_POINT.y)<=dist(two.x,two.y,COMPARE_POINT.x,COMPARE_POINT.y)){
+      return 1;
+    }
+    return 0;
   }
 }
 
-class IDA{
-    HashMap<PVector, Boolean> vis = new HashMap<PVector, Boolean>();
-    HashMap<PVector, ArrayList<GType> > graph = new HashMap<PVector, ArrayList<GType> >();
-    HashMap<PVector, Float> intermediate_results = new HashMap<PVector, Float>();
-    //stores a list of integers which encode the positions they represent
-    ArrayList<PVector> ASTAR_PATH;
-    PVector start,goal;
-    HashMap<PVector, PVector> parent_pointers = new HashMap<PVector, PVector>();
-    public int hashCode(float x, float y){
-      int hash = (int)( 1400*(y) + x );
-      //print("HASH:" + hash); 
-      return hash;
+class PQTwo implements Comparator<PVector>{
+  public int compare(PVector one, PVector two){
+    if(one.x > two.x){
+      return 1;
+    } else if(one.x < two.x){
+      return -1;
+    } else {
+      if(one.y<two.y){
+        return 1;
+      } else if(one.y>two.y){
+        return -1;
+      } else {
+        return 0;
+      }
     }
-    public float euclidean_heuristic_function(Location one, Location two){
-      float f = dist(one.x,one.y,two.x,two.y);
-      return f;
-    }
-    
+  }
+}
 
-    public IDA(HashMap<PVector, ArrayList<GType> > graph, Location start, Location goal){
-      this.start = new PVector(start.x,start.y);
-      this.goal = new PVector(goal.x,goal.y);
-      this.parent_pointers = new HashMap<PVector, PVector>();
-      this.ASTAR_PATH = new ArrayList<PVector>();
-      this.graph = graph;
-    }
-    //start off with heuristic value = 0
-    public ArrayList<Location> IDA_Algo(Location start){
-      return new ArrayList<Location>(); 
-    }
-    
-    
-    public ArrayList<PVector> backtracking(PVector fin){
-      ArrayList<PVector> res = new ArrayList<PVector>();
-      while(fin != null){
-        res.add(fin);
-        fin = parent_pointers.get(fin);
+
+class RRT{
+   PVector seed;
+   float dq;
+   float MAX_ITER;
+   float INTERNAL_COUNTER;
+   HashMap<PVector, ArrayList<GType> > graph;
+   HashMap<PVector, Boolean> hset = new HashMap<PVector, Boolean>();
+   ArrayList<PVector> seen_space = new ArrayList<PVector>();
+   ArrayList<Location> obstacle_space= new ArrayList<Location>();
+   public static final int K = 10;
+   //we want to use some dispersion heuristic, so 
+   public ArrayList<Float> softmax(ArrayList<Float> vals){
+      float sm = 0;
+      ArrayList<Float> n = new ArrayList<Float>();
+      for(int i = 0; i < vals.size(); i++){
+         sm += Math.exp(vals.get(i));
       }
-      return res;
-    }
-    /*
-    public ArrayList<Integer> backtrack(int end){
-      println("START BACKTRACKING");
-      ArrayList<Integer> res = new ArrayList<Integer>();
-      while(true){
-        println("CURRENT POSITION: " + end);
-        res.add(end);
-        if(!parent_pointers.containsKey(end)){break;}
-        end= parent_pointers.get(end);
+      for(int i = 0; i < vals.size(); i++){
+         float nw = (float)(Math.exp(vals.get(i)))/(float)(sm);
+         n.add(nw);
       }
-      return res;
-    }
-    */
-    
-    public ArrayList<Location> iterative_deepening_astar(){
-      return new ArrayList<Location>();
-    }
-    
-    /*
-    public ArrayList<Integer> BFS(){
-      Queue<Location> q = new LinkedList<Location>();
-      q.add(this.start);
-      float[] dx = {1,0,-1,0};
-      float[] dy = {0,-1,0,1};
-      ArrayList<Location> seen = new ArrayList<Location>();
-      ArrayList<Integer> ret = new ArrayList<Integer>();
-      while(q.size()>0){
-        Location tp = q.poll();
-        if(tp.x==this.goal.x&&tp.y==this.goal.y){break;}
-        println("POINT: " + tp.x + " " + tp.y);
-        for(int idx = 0; idx < dx.length; idx++){
-          Location nxt = new Location(tp.x+dx[idx],tp.y+dy[idx]);
-          if(parent_pointers.containsKey(hashCode(nxt.x,nxt.y))){
-            continue;
-          }
-          if(optimized_impasse.containsKey(hashCode(nxt.x,nxt.y))){
-            continue;
-          }
-            parent_pointers.put(hashCode(tp.x,nxt.y),hashCode(tp.x,tp.y));
-            println("ADD: " + nxt.x + " " + nxt.y);
-            seen.add(nxt);
-            q.add(nxt);
-          }
+      return n;
+  }
+   public boolean vec_contains(PVector v){
+     if(hset.containsKey(v)){return true;}return false;
+   }
+   
+   public RRT(PVector seed, float dq, float MAX_ITER){
+     this.seed = seed;
+     this.dq = dq;
+     this.MAX_ITER = MAX_ITER;
+     graph = new HashMap<PVector, ArrayList<GType> >();
+     seen_space.add(seed);
+     this.INTERNAL_COUNTER = 0;
+   }
+   //this method is kind of computationally heavy
+   public PVector nearest_point(PVector comp){
+     float mdist  = 1000000000;
+     PVector cur = new PVector(0,0);
+     for(PVector v : seen_space){
+       mdist = min(mdist, dist(comp.x,comp.y,v.x,v.y));
+       if(mdist == dist(comp.x,comp.y,v.x,v.y)){
+         mdist = dist(comp.x,comp.y,v.x,v.y);
+         cur = new PVector(v.x,v.y);
        }
-      //ret = backtrack(hashCode(this.goal.x,this.goal.y));
-      //this.BFS_Path = ret;
-      return ret;
-    }
-    */
-    
-    public ArrayList<PVector> IDA(){
-       PriorityQueue<GType> pq = new PriorityQueue(new IDAComparator());
-       GType seed = new GType(start, 0, dist(start.x,start.y,goal.x,goal.y));
-       pq.add(seed);
-       ArrayList<PVector> path = new ArrayList<PVector>();
-       while(pq.size() > 0){
-         GType frnt = pq.poll();
-         float f_cost = frnt.COST_TO_REACH;
-         float g_cost = frnt.HEURISTIC_COST;
-         ArrayList<GType> adj = graph.get(frnt.evec);
-         for(GType p : adj){
-           float new_f = f_cost + p.COST_TO_REACH;
-           float new_g = dist(p.evec.x,p.evec.y,goal.x,goal.y);
-           if(!intermediate_results.containsKey(p.evec)){
-             intermediate_results.put(p.evec, new_f + new_g);
-             GType g = new GType(p.evec, new_f, new_g);
-             pq.add(g);
-           } else {
-             if(Math.min(intermediate_results.get(p.evec), new_f + new_g) == new_f + new_g){
-               GType ng = new GType(p.evec, new_f, new_g);
-               pq.add(ng);
-               parent_pointers.put(p.evec, frnt.evec);
-             }
-           }
+     }
+     return cur;
+   }
+   
+   //returns next node to expand our RRT on some node
+   //the idea is that the max of the max dists in the KNN should approximate the voronoi region areas (i.e. nodes that are far away from other nodes
+   //should have a higher probability of being expanded)
+   public int k_nearest_neighbors(int K){
+     PriorityQueue<PVector> pq = new PriorityQueue(new PQComparator());
+     ArrayList<Float> MAX_DISTS = new ArrayList<Float>();
+     for(int i = 0; i < seen_space.size(); i++){
+       COMPARE_POINT = seen_space.get(i);
+       for(int j = 0; j < seen_space.size(); j++){
+         if(i==j){continue;}
+         pq.add(seen_space.get(j));
+       }
+       int idx = 0;
+       float DIST = 1000000007;
+       while(idx < K){
+         PVector tp = pq.poll();
+         DIST = min(DIST,dist(seen_space.get(i).x,seen_space.get(i).y,tp.x,tp.y));
+         idx++;
+       }
+       MAX_DISTS.add( (float)(DIST)/(float)(K) );
+       pq.clear();
+     }
+     ArrayList<Float> nxt = softmax(MAX_DISTS);
+     ArrayList<PVector> sample = new ArrayList<PVector>();
+     for(int i = 0; i < nxt.size(); i++){sample.add(new PVector(nxt.get(i),i));}
+     Collections.sort(sample, new PQTwo());
+     int idx = 0;
+     float f = random(0,1);
+     for(int i = 0; i < sample.size(); i++){
+       if(sample.get(i).x <= f){
+         idx = (int)sample.get(i).y;
+         break;
+       }
+     }
+     
+     return idx;
+   }
+   
+   
+   public boolean rrtExploration(){
+     println("INTERNAL COUNTER: " + this.INTERNAL_COUNTER);
+       float seed = random(0,1);
+       if(this.INTERNAL_COUNTER <= this.MAX_ITER){
+         PVector rp = new PVector( random(0,1400), random(0,900) );
+         PVector closest = nearest_point(rp);
+         float ang = atan( (float)(rp.y-closest.y)/(float)(rp.x-closest.x) );
+         PVector new_pt = new PVector(closest.x + (dq*cos(ang)), closest.y + (dq*sin(ang)) );
+         if(graph.containsKey(closest)){
+           ArrayList<GType> tmp = graph.get(closest);
+           tmp.add( new GType(new_pt, dist(closest.x,closest.y,new_pt.x,new_pt.y) ));
+           graph.put(closest,tmp);
+           println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
+         } else {
+           ArrayList<GType> tmp = new ArrayList<GType>();
+           tmp.add( new GType(new_pt, dist(closest.x,closest.y,new_pt.x,new_pt.y)) );
+           println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
+           graph.put(closest, tmp);
+         }
+         seen_space.add(new_pt);
+         this.INTERNAL_COUNTER++;
+         return true;
+       } else if(this.INTERNAL_COUNTER > this.MAX_ITER/5 && this.INTERNAL_COUNTER < this.MAX_ITER){
+         int nxt = k_nearest_neighbors(K);
+         println("INDEX: " + nxt);//issue is we are choosing the same node to expand upon too many times
+         PVector corres = seen_space.get(nxt);
+         PVector rp = new PVector(random(0,1400),random(0,900));
+         //PVector closest = nearest_point(rp);
+         float ang = atan( (float)(rp.y-corres.y)/(float)(rp.x-corres.x) );
+         PVector new_pt = new PVector(corres.x + (dq*(cos(ang))), corres.y + (dq*(sin(ang))) ) ;
+         if(graph.containsKey(corres)){
+           ArrayList<GType> tmp = graph.get(corres);
+           tmp.add( new GType(new_pt, dist(corres.x,corres.y,new_pt.x,new_pt.y) ));
+           graph.put(corres,tmp);
+           //println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
+         } else {
+           ArrayList<GType> tmp = new ArrayList<GType>();
+           tmp.add( new GType(new_pt, dist(corres.x,corres.y,new_pt.x,new_pt.y)) );
+           //println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
+           graph.put(corres, tmp);
+         }
+         seen_space.add(new_pt);
+         this.INTERNAL_COUNTER++;
+         return true;
+      } else {
+        return false;
+      }
+   }
+   
+   public void displayRRT(PVector state){
+     println("----------------------------------------------------------");
+     LinkedList<PVector> qp = new LinkedList<PVector>();
+     qp.add(state);
+     //for(PVector p : seen_space){fill(255,0,0); circle(p.x,p.y,10);}
+     ArrayList<GType> see = graph.get(state);
+     //for(PVector p : see){println(p.x + " " + p.y);}
+     circle(state.x,state.y,10);
+     stroke(0,0,255);
+     fill(0,0,255);
+     while(qp.size() > 0){
+       if(qp.size()==0){break;}
+       PVector nxt = qp.poll();
+       println("SIZE: " + qp.size());
+       ArrayList<GType> adj = new ArrayList<GType>();
+       if(graph.containsKey(nxt)){
+          adj = graph.get(nxt);
+       } else {
+         continue;
+       }
+       println("CURRENT POSITION: " + nxt.x + " " + nxt.y);
+       for(GType mvec : adj){
+         if(!vec_contains(mvec.evec)){
+           println("ADDING POINT: " + mvec.evec.x + " " + mvec.evec.y);
+           circle(mvec.evec.x,mvec.evec.y,10);
+           println("LINE DRAWN: " + nxt.x + " " + nxt.y + " " + mvec.evec.x +  " " + mvec.evec.y);
+           line(nxt.x,nxt.y,mvec.evec.x,mvec.evec.y);
+           hset.put(mvec.evec,true);
+           qp.add(mvec.evec);
+         } else {
+           println("ALREADY SEEN");
          }
        }
-       
-       return new ArrayList<PVector>();
-    }
+     }
+     println("----------------------------------------------------------------------------");
+    
+   }
+   
+   public boolean detectObstacle(PVector one, PVector two){
+     return true;
+   }
+   
+   public void reset(){
+     hset.clear();
+   }
 }
