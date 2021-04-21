@@ -80,8 +80,9 @@ class RRT{
    }
    
    //returns next node to expand our RRT on some node
-   //the idea is that the max of the max dists in the KNN should approximate the voronoi region areas
-   public PVector k_nearest_neighbors(int K){
+   //the idea is that the max of the max dists in the KNN should approximate the voronoi region areas (i.e. nodes that are far away from other nodes
+   //should have a higher probability of being expanded)
+   public int k_nearest_neighbors(int K){
      PriorityQueue<PVector> pq = new PriorityQueue(new PQComparator());
      ArrayList<Float> MAX_DISTS = new ArrayList<Float>();
      for(int i = 0; i < seen_space.size(); i++){
@@ -91,34 +92,37 @@ class RRT{
          pq.add(seen_space.get(j));
        }
        int idx = 0;
-       float DIST = 0;
+       float DIST = 1000000007;
        while(idx < K){
          PVector tp = pq.poll();
-         DIST = max(DIST, dist(seen_space.get(i).x,seen_space.get(i).y,tp.x,tp.y));
+         DIST = min(DIST,dist(seen_space.get(i).x,seen_space.get(i).y,tp.x,tp.y));
          idx++;
        }
-       MAX_DISTS.add(DIST);
+       MAX_DISTS.add( (float)(DIST)/(float)(K) );
+       pq.clear();
      }
      ArrayList<Float> nxt = softmax(MAX_DISTS);
      ArrayList<PVector> sample = new ArrayList<PVector>();
      for(int i = 0; i < nxt.size(); i++){sample.add(new PVector(nxt.get(i),i));}
      Collections.sort(sample, new PQTwo());
      int idx = 0;
+     float f = random(0,1);
      for(int i = 0; i < sample.size(); i++){
-       if(sample.get(i).x <= Math.random()){
+       if(sample.get(i).x <= f){
          idx = (int)sample.get(i).y;
          break;
        }
      }
      
-     return seen_space.get(idx);
+     return idx;
    }
+   
    
    public boolean rrtExploration(){
      println("INTERNAL COUNTER: " + this.INTERNAL_COUNTER);
-       PVector rp = new PVector( random(0,1400), random(0,900) );
        float seed = random(0,1);
-       if(this.INTERNAL_COUNTER <= this.MAX_ITER/5){
+       if(this.INTERNAL_COUNTER <= this.MAX_ITER){
+         PVector rp = new PVector( random(0,1400), random(0,900) );
          PVector closest = nearest_point(rp);
          float ang = atan( (float)(rp.y-closest.y)/(float)(rp.x-closest.x) );
          PVector new_pt = new PVector(closest.x + (dq*cos(ang)), closest.y + (dq*sin(ang)) );
@@ -137,26 +141,30 @@ class RRT{
          this.INTERNAL_COUNTER++;
          return true;
        } else if(this.INTERNAL_COUNTER > this.MAX_ITER/5 && this.INTERNAL_COUNTER < this.MAX_ITER){
-         PVector nxt = k_nearest_neighbors(K);
-         PVector cmp = nearest_point(nxt);
-         float ang = atan( (float)(nxt.y-cmp.y)/(float)(nxt.x-cmp.x) );
-         PVector new_pt = new PVector(cmp.x + (dq*cos(ang)), cmp.y + (dq*sin(ang)) );
-         if(graph.containsKey(cmp)){
-           ArrayList<GType> tmp = graph.get(cmp);
-           tmp.add( new GType(nxt, dist(cmp.x,cmp.y,nxt.x,nxt.y) ));
-           graph.put(cmp,tmp);
+         int nxt = k_nearest_neighbors(K);
+         println("INDEX: " + nxt);//issue is we are choosing the same node to expand upon too many times
+         PVector corres = seen_space.get(nxt);
+         PVector rp = new PVector(random(0,1400),random(0,900));
+         //PVector closest = nearest_point(rp);
+         float ang = atan( (float)(rp.y-corres.y)/(float)(rp.x-corres.x) );
+         PVector new_pt = new PVector(corres.x + (dq*(cos(ang))), corres.y + (dq*(sin(ang))) ) ;
+         if(graph.containsKey(corres)){
+           ArrayList<GType> tmp = graph.get(corres);
+           tmp.add( new GType(new_pt, dist(corres.x,corres.y,new_pt.x,new_pt.y) ));
+           graph.put(corres,tmp);
            //println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
          } else {
            ArrayList<GType> tmp = new ArrayList<GType>();
-           tmp.add( new GType(nxt, dist(cmp.x,cmp.y,nxt.x,nxt.y)) );
+           tmp.add( new GType(new_pt, dist(corres.x,corres.y,new_pt.x,new_pt.y)) );
            //println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
-           graph.put(cmp, tmp);
+           graph.put(corres, tmp);
          }
          seen_space.add(new_pt);
          this.INTERNAL_COUNTER++;
          return true;
+      } else {
+        return false;
       }
-     return false;
    }
    
    public void displayRRT(PVector state){
