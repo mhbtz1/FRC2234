@@ -55,7 +55,9 @@ class Bug{
 Bug bg;
 TangentBug tbg;
 MotionProfiler mr;
-//Perfect_Preprocessing prcs;
+IDA ida;
+RRT myRRT;
+
 PrintWriter controlPoints;
 static final int CIRC_RADIUS = 8;
 ArrayList<Location> bad_places = new ArrayList<Location>();
@@ -77,13 +79,22 @@ boolean USE_FIRST_HEURISTIC = false;
 boolean TANGENT_BUG = true;
 boolean BUGNAV_ONE = false;
 boolean BUGNAV_TWO = false;
+boolean TEST_BEZIER_CURVE = false;
+boolean TEST_RRT = false;
 
 public void setup(){
   size(1400,1400);
   frameRate(20);
+  //tbez = new BezierProfile(0,0,120,120,240,120,360,0);
+  //gen_waypoints();
+  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 45, 500);
+  
   //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
   bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
   tbg = new TangentBug(120, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
+  
+  //when RRT wor
+
   String[] r = loadStrings("controlPoints.txt");
   if(!SET_OF_WAYPOINTS){
     controlPoints = createWriter("controlPoints.txt");
@@ -272,6 +283,8 @@ public void path_planning_one(){
          INITIATE_COOLDOWN = true;
     }
     
+    
+    //some ugly heuristic stuff
     if(!INITIATE_COOLDOWN){
       bg.current_loc.x += OPT_X;
       bg.current_loc.y += OPT_Y;
@@ -311,17 +324,21 @@ boolean is_reversed(float OPT_X, float OPT_Y, float PREV_OPT_X, float PREV_OPT_Y
   return false;
 }
 
-public void draw(){
 
+public void draw(){
+   //path_planning_one();
+   //if(!draw_obstacle){
+   background(255);
+    
     if(!myRRT.rrtExploration()){
       myRRT.displayRRT(myRRT.seed);
       myRRT.reset();
-      ida = new IDA(myRRT.graph, current_loc, goal_loc);
-      //ida.IDA();
+      ida = new IDA(myRRT.graph, new PVector(current_loc.x,current_loc.y), new PVector(goal_loc.x,goal_loc.y) );
+      //ida.ida();
     }
-
-   //path_planning_one();
-   //if(!draw_obstacle){
+     for(Location l : bad_places){
+        ellipse(l.x,l.y,8,8);
+     }
      if(TANGENT_BUG){
        if(!SET_OF_WAYPOINTS){
          //println("TANGENT PATHING");
@@ -344,8 +361,8 @@ public void draw(){
      }
    //}
    //path_planning_two();
-
 }
+
 public void mouseDragged(){
   if(draw_obstacle){
     println(mouseX + " " + mouseY);
@@ -358,6 +375,10 @@ public void keyPressed(){
   if(key==BACKSPACE){
     println("Pressed!");
     draw_obstacle=false;
-    tbg.compute_inaccessible_angles();
+    //tbg.compute_inaccessible_angles();
+
+    //ida = new IDA(bad_places, new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
+    //ida.BFS();
+    //for(int l : ida.BFS_Path){System.out.println("ENCODED POS: " + l);}
   }
 }
