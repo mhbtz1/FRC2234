@@ -1,13 +1,22 @@
 import java.io.*;
 import java.util.*;
 
-PVector COMPARE_POINT;
-class PQComparator implements Comparator<PVector>{
-  public int compare(PVector one, PVector two){
-    if(dist(one.x,one.y,COMPARE_POINT.x,COMPARE_POINT.y)<=dist(two.x,two.y,COMPARE_POINT.x,COMPARE_POINT.y)){
-      return 1;
-    }
-    return 0;
+class PDist{
+  PVector p;
+  float dist;
+  public PDist(PVector p, float dist){
+    this.p = p;
+    this.dist = dist;
+  }
+}
+
+
+class PQComparator implements Comparator<PDist>{
+  public int compare(PDist one, PDist two){
+     if(one.dist > two.dist){
+       return 1;
+     }
+     return 0;
   }
 }
 
@@ -41,14 +50,15 @@ class RRT{
    ArrayList<Location> obstacle_space= new ArrayList<Location>();
    public static final int K = 10;
    //we want to use some dispersion heuristic, so 
+   //normal softmax won't work because the elements in vals are very big
    public ArrayList<Float> softmax(ArrayList<Float> vals){
       float sm = 0;
       ArrayList<Float> n = new ArrayList<Float>();
       for(int i = 0; i < vals.size(); i++){
-         sm += Math.exp(vals.get(i));
+         sm += vals.get(i);
       }
       for(int i = 0; i < vals.size(); i++){
-         float nw = (float)(Math.exp(vals.get(i)))/(float)(sm);
+         float nw = (float)(vals.get(i))/(float)(sm);
          n.add(nw);
       }
       return n;
@@ -83,37 +93,45 @@ class RRT{
    //the idea is that the max of the max dists in the KNN should approximate the voronoi region areas (i.e. nodes that are far away from other nodes
    //should have a higher probability of being expanded)
    public int k_nearest_neighbors(int K){
-     PriorityQueue<PVector> pq = new PriorityQueue(new PQComparator());
+     ArrayList<PVector> pq = new ArrayList<PVector>();
      ArrayList<Float> MAX_DISTS = new ArrayList<Float>();
      for(int i = 0; i < seen_space.size(); i++){
-       COMPARE_POINT = seen_space.get(i);
        for(int j = 0; j < seen_space.size(); j++){
          if(i==j){continue;}
          pq.add(seen_space.get(j));
        }
        int idx = 0;
-       float DIST = 1000000007;
-       while(idx < K){
-         PVector tp = pq.poll();
-         DIST = min(DIST,dist(seen_space.get(i).x,seen_space.get(i).y,tp.x,tp.y));
-         idx++;
+       float DIST = 0;
+       ArrayList<PDist> augmented_dist = new ArrayList<PDist>();
+       for(int j = 0; j < pq.size(); j++){
+         augmented_dist.add(new PDist(pq.get(j), dist(pq.get(j).x,pq.get(j).y,seen_space.get(i).x,seen_space.get(i).y)) );
        }
-       MAX_DISTS.add( (float)(DIST)/(float)(K) );
+       Collections.sort(augmented_dist, new PQComparator());
+       DIST = augmented_dist.get(K).dist;
+       MAX_DISTS.add( (float)(DIST) );
        pq.clear();
      }
+     for(int i = 0; i < MAX_DISTS.size(); i++){
+       println(MAX_DISTS.get(i));
+     }
+     println("-----------------------------------------------");
      ArrayList<Float> nxt = softmax(MAX_DISTS);
      ArrayList<PVector> sample = new ArrayList<PVector>();
-     for(int i = 0; i < nxt.size(); i++){sample.add(new PVector(nxt.get(i),i));}
+     for(int i = 0; i < nxt.size(); i++){
+       sample.add(new PVector(nxt.get(i),i));
+     }
      Collections.sort(sample, new PQTwo());
-     int idx = 0;
-     float f = random(0,1);
+     int idx = (int)sample.get(sample.size()-1).y;
+     //for(int i = 0; i < sample.size(); i++){print(sample.get(i) + " ");}println();
+     
+     /*
      for(int i = 0; i < sample.size(); i++){
-       if(sample.get(i).x <= f){
+       if(sample.get(i).x >= f){
          idx = (int)sample.get(i).y;
          break;
        }
      }
-     
+     */
      return idx;
    }
    
@@ -121,7 +139,7 @@ class RRT{
    public boolean rrtExploration(){
      println("INTERNAL COUNTER: " + this.INTERNAL_COUNTER);
        float seed = random(0,1);
-       if(this.INTERNAL_COUNTER <= this.MAX_ITER){
+       if(this.INTERNAL_COUNTER <= this.MAX_ITER/3){
          PVector rp = new PVector( random(0,1400), random(0,900) );
          PVector closest = nearest_point(rp);
          float ang = atan( (float)(rp.y-closest.y)/(float)(rp.x-closest.x) );
@@ -140,7 +158,7 @@ class RRT{
          seen_space.add(new_pt);
          this.INTERNAL_COUNTER++;
          return true;
-       } else if(this.INTERNAL_COUNTER > this.MAX_ITER/5 && this.INTERNAL_COUNTER < this.MAX_ITER){
+       } else if(this.INTERNAL_COUNTER > this.MAX_ITER/3 && this.INTERNAL_COUNTER < this.MAX_ITER){
          int nxt = k_nearest_neighbors(K);
          println("INDEX: " + nxt);//issue is we are choosing the same node to expand upon too many times
          PVector corres = seen_space.get(nxt);
