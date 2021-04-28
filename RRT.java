@@ -124,16 +124,25 @@ class RRT{
      int idx = (int)sample.get(sample.size()-1).y;
      //for(int i = 0; i < sample.size(); i++){print(sample.get(i) + " ");}println();
      
-     /*
+     
      for(int i = 0; i < sample.size(); i++){
+       float f = random(0,1);
        if(sample.get(i).x >= f){
          idx = (int)sample.get(i).y;
          break;
        }
      }
-     */
+     
      return idx;
    }
+   
+   //given a new node we want to add to our RRT and the node it is connected to
+   //check if the edge overlaps with any part of the obstacles in our space
+   //if so return FALSE, otherwise return TRUE
+   public boolean IN_FREE_SPACE(){
+     return false;
+   }
+   
    
    
    public boolean rrtExploration(){
@@ -155,6 +164,17 @@ class RRT{
            println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
            graph.put(closest, tmp);
          }
+         /*
+          if(graph.containsKey(new_pt)){
+           ArrayList<GType> cur = graph.get(new_pt);
+           cur.add(new GType(closest, dist(closest.x,closest.y,new_pt.x,new_pt.y)));
+           graph.put(new_pt,cur);
+         } else {
+           ArrayList<GType> cur = new ArrayList<GType>();
+           cur.add(new GType(closest, dist(closest.x,closest.y,new_pt.x,new_pt.y)));
+           graph.put(new_pt,cur);
+         }
+         */
          seen_space.add(new_pt);
          this.INTERNAL_COUNTER++;
          return true;
@@ -177,6 +197,17 @@ class RRT{
            //println(closest.x + " " + closest.y + " " + new_pt.x + " " + new_pt.y);
            graph.put(corres, tmp);
          }
+         /*
+         if(graph.containsKey(new_pt)){
+           ArrayList<GType> cur = graph.get(new_pt);
+           cur.add(new GType(corres, dist(corres.x,corres.y,new_pt.x,new_pt.y)));
+           graph.put(new_pt,cur);
+         } else {
+           ArrayList<GType> cur = new ArrayList<GType>();
+           cur.add(new GType(corres, dist(corres.x,corres.y,new_pt.x,new_pt.y)));
+           graph.put(new_pt,cur);
+         }
+         */
          seen_space.add(new_pt);
          this.INTERNAL_COUNTER++;
          return true;
@@ -198,29 +229,28 @@ class RRT{
      while(qp.size() > 0){
        if(qp.size()==0){break;}
        PVector nxt = qp.poll();
-       println("SIZE: " + qp.size());
+       //println("SIZE: " + qp.size());
        ArrayList<GType> adj = new ArrayList<GType>();
        if(graph.containsKey(nxt)){
           adj = graph.get(nxt);
        } else {
          continue;
        }
-       println("CURRENT POSITION: " + nxt.x + " " + nxt.y);
+       //println("CURRENT POSITION: " + nxt.x + " " + nxt.y);
        for(GType mvec : adj){
          if(!vec_contains(mvec.evec)){
-           println("ADDING POINT: " + mvec.evec.x + " " + mvec.evec.y);
+           //println("ADDING POINT: " + mvec.evec.x + " " + mvec.evec.y);
            circle(mvec.evec.x,mvec.evec.y,10);
-           println("LINE DRAWN: " + nxt.x + " " + nxt.y + " " + mvec.evec.x +  " " + mvec.evec.y);
+           //println("LINE DRAWN: " + nxt.x + " " + nxt.y + " " + mvec.evec.x +  " " + mvec.evec.y);
            line(nxt.x,nxt.y,mvec.evec.x,mvec.evec.y);
            hset.put(mvec.evec,true);
            qp.add(mvec.evec);
          } else {
-           println("ALREADY SEEN");
+           //println("ALREADY SEEN");
          }
        }
      }
      println("----------------------------------------------------------------------------");
-    
    }
    
    public boolean detectObstacle(PVector one, PVector two){
