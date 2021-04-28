@@ -26,6 +26,7 @@ class IDA{
     ArrayList<PVector> ASTAR_PATH;
     PVector start,goal;
     HashMap<PVector, PVector> parent_pointers = new HashMap<PVector, PVector>();
+    ArrayList<PVector> classPath = new ArrayList<PVector>();
     public int hashCode(float x, float y){
       int hash = (int)( 1400*(y) + x );
       //print("HASH:" + hash); 
@@ -109,7 +110,30 @@ class IDA{
       }
        println("TERMINATE");
        path = backtracking(goal);
+       this.classPath = path;
        println("OPTIMAL PATH LENGTH: " + intermediate_results.get(goal) );
        return path;
     }
+    
+    public ArrayList<PVector> augment_waypoints(float STEP){
+      ArrayList<PVector> RRT_waypoints = new ArrayList<PVector>();
+      for(int i = 0; i < classPath.size()-1; i++){
+        float total_dist = sqrt(dist(classPath.get(i).x,classPath.get(i).y,classPath.get(i+1).x,classPath.get(i+1).y));
+        float dy = (Float)(classPath.get(i).y-classPath.get(i+1).y)/total_dist;
+        float dx = (float)(classPath.get(i).x-classPath.get(i+1).x)/total_dist;
+        PVector cur_point = new PVector(classPath.get(i).x,classPath.get(i).y);
+        int j = 0;
+        while(true){
+          RRT_waypoints.add(new PVector(classPath.get(i).x + (dx*j) , classPath.get(i).y + (dy*j) ) );
+          ++j;
+          if(dist(cur_point.x,cur_point.y,classPath.get(i+1).x,classPath.get(i+1).y) < 2){
+            break;
+          }
+        }
+      }
+      return RRT_waypoints;
+    }
+    
+    
+    
 }
