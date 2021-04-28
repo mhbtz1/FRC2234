@@ -119,13 +119,16 @@ class IDA{
       ArrayList<PVector> RRT_waypoints = new ArrayList<PVector>();
       for(int i = 0; i < classPath.size()-1; i++){
         float total_dist = sqrt(dist(classPath.get(i).x,classPath.get(i).y,classPath.get(i+1).x,classPath.get(i+1).y));
-        float dy = (Float)(classPath.get(i).y-classPath.get(i+1).y)/total_dist;
+        float dy = (float)(classPath.get(i).y-classPath.get(i+1).y)/total_dist;
         float dx = (float)(classPath.get(i).x-classPath.get(i+1).x)/total_dist;
         PVector cur_point = new PVector(classPath.get(i).x,classPath.get(i).y);
         int j = 0;
         while(true){
-          RRT_waypoints.add(new PVector(classPath.get(i).x + (dx*j) , classPath.get(i).y + (dy*j) ) );
+          RRT_waypoints.add(cur_point);
+          cur_point.x += dx;
+          cur_point.y += dy;
           ++j;
+          println("DISTANCE: " + dist(cur_point.x,cur_point.y,classPath.get(i+1).x,classPath.get(i+1).y) );
           if(dist(cur_point.x,cur_point.y,classPath.get(i+1).x,classPath.get(i+1).y) < 2){
             break;
           }
