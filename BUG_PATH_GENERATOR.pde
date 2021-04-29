@@ -64,7 +64,7 @@ ArrayList<Location> bad_places = new ArrayList<Location>();
 Location current_loc = new Location(200,300);
 Location goal_loc = new Location(800,400);
 boolean draw_obstacle = true;
-boolean SET_OF_WAYPOINTS = false;
+boolean SET_OF_WAYPOINTS = true;
 float OPT_X=-1,OPT_Y=-1;
 float PREV_OPT_X=-1,PREV_OPT_Y=-1;
 float PREV_X = -1;
@@ -87,16 +87,15 @@ public void setup(){
   frameRate(20);
   tbez = new BezierProfile(0,0,120,120,240,120,360,0);
   gen_waypoints();
-  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 640);
+  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 440);
   
   //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
   bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
   tbg = new TangentBug(120, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y));
 
   String[] r = loadStrings("controlPoints.txt");
-  if(!SET_OF_WAYPOINTS){
-    controlPoints = createWriter("controlPoints.txt");
-  } 
+  //if(!SET_OF_WAYPOINTS){
+  controlPoints = createWriter("controlPoints.txt"); 
   mr = new MotionProfiler();
 }
 
@@ -347,6 +346,12 @@ public void draw(){
       }
       ArrayList<PVector> augmented = ida.augment_waypoints(0.04);
       for(PVector p: augmented){fill(255,0,255); circle(p.x,p.y,4);}
+      MotionProfiler M_P = new MotionProfiler();
+      M_P.iterate_profiles();
+      fill(0,255,0);
+      for(Location true_w : M_P.true_waypoints){
+        circle(true_w.x, true_w.y, 8);
+      }
       stroke(0,0,255);
     }
    }
@@ -371,9 +376,12 @@ public void draw(){
        }
      }
      
+     
+     /*
      if(SET_OF_WAYPOINTS){
        mr.iterate_profiles();
      }
+     */
    //}
    //path_planning_two();
 }
