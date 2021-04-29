@@ -10,7 +10,7 @@ import java.util.*;
 
 class IDAComparator implements Comparator<GType>{
   public int compare(GType one, GType two){
-     if(one.COST_TO_REACH + one.HEURISTIC_COST < two.COST_TO_REACH + two.HEURISTIC_COST){
+     if(one.COST_TO_REACH + one.HEURISTIC_DIST < two.COST_TO_REACH + two.HEURISTIC_DIST){
        return 1;
      } else {
        return 0;
@@ -119,22 +119,24 @@ class IDA{
       ArrayList<PVector> RRT_waypoints = new ArrayList<PVector>();
       for(int i = 0; i < classPath.size()-1; i++){
         float total_dist = sqrt(dist(classPath.get(i).x,classPath.get(i).y,classPath.get(i+1).x,classPath.get(i+1).y));
-        float dy = (float)(classPath.get(i).y-classPath.get(i+1).y)/(float)(classPath.get(i).x-classPath.get(i+1).x);
-        float dx = 1;
+        float slope = (float)(classPath.get(i).y-classPath.get(i+1).y)/(float)(classPath.get(i).x-classPath.get(i+1).x);
+        float angle = atan(slope)+(PI/(float)(2));
+        
+        PVector param = new PVector(classPath.get(i).x,classPath.get(i).y);
         PVector cur_point = new PVector(classPath.get(i).x,classPath.get(i).y);
-        int j = 0;
-        while(true){
-          RRT_waypoints.add(cur_point);
-          println("DX: " + dx + "DY: " + dy);
-          cur_point.x += dx;
-          cur_point.y += dy;
-          ++j;
-          println("DISTANCE: " + dist(cur_point.x,cur_point.y,classPath.get(i+1).x,classPath.get(i+1).y) );
-          if(dist(cur_point.x,cur_point.y,classPath.get(i+1).x,classPath.get(i+1).y) < 2){
-            break;
-          }
+        cur_point.sub(classPath.get(i+1));
+        float VL = 0;
+        println(cur_point.x + " " + cur_point.y);
+        float eps = 0.02;
+        while(VL <= 1){
+          println("J VALUE: " + VL);
+          RRT_waypoints.add(param);
+          param = new PVector( (float)(param.x) + (float)(cur_point.x*VL), (float)(param.y) + (float)(cur_point.y*VL) );
+          VL += STEP; //when i do j += STEP in this line, the RRT flips out for some reason
         }
+        
       }
+      println("RRT WAYPOINTS SIZE: " + RRT_waypoints.size());
       return RRT_waypoints;
     }
     
