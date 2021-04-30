@@ -1,124 +1,166 @@
 //cubic bezier curve can be represented as:
 //B(x) = (1-x)^3 * (P0) + 3x(1-x)^2 * (P1) + 3x^2(1-x)*(P2) + x^3 * (P3)
 
-class Location{
-  float x, y;
-  public Location(float x, float y){
-    this.x = x;
-    this.y = y;
+//iterative deepening A*
+import java.util.*;
+
+
+
+//the nice thing about using RRTs for making continuous stuff discrete is that the graph structure
+//already encodes the obstacle space for us.
+
+
+
+class IDAComparator implements Comparator<GType>{
+  public int compare(GType one, GType two){
+     if(one.COST_TO_REACH + one.HEURISTIC_COST < two.COST_TO_REACH + two.HEURISTIC_COST){
+       return 1;
+     } else {
+       return 0;
+     }
   }
-  public int hashCode(){
-    return (int)(x) ^ (int)(y);
-  }
 }
 
-//objective: create a smooth profile of cubic bezier curves with 4 control points that some point robot can follow a path along.
-//let P(n,k) be the nth control point (n <= 3) for the kth bezier curve:
-
-//for n=0 and n=3, it is trivial, these points are given to be one of the pre-existing waypoints.
-
-//for n=2, P(2,i) = 2*K(i+1) - P(1,i+1) for 0 <= i <= n-2
-// P(2,n-1) = 0.5*(K(n) + P(1,n-1))
-
-
-
-void thomas_algorithm(){
-  
-}
-float sigmoid_spline(float x){
-  return (float)( ((20)/(1+pow((float)(Math.E),0.2*x)))* 20) + 300;
-}
-
-
-//cubic bezier profile
-class BezierProfile{
-  float init_x, init_y;
-  float ref1_x, ref1_y;
-  float ref2_x, ref2_y;
-  float final_x, final_y;
-  public BezierProfile(float init_x, float init_y, float ref1_x,float ref1_y, float ref2_x, float ref2_y, float final_x, float final_y){
-    this.init_x = init_x;
-    this.init_y = init_y;
-    this.ref1_x = ref1_x;
-    this.ref1_y = ref1_y;
-    this.ref2_x = ref2_x;
-    this.ref2_y = ref2_y;
-    this.final_x = final_x;
-    this.final_y = final_y;
-  }
-  
-  //takes some input [0,1]
-  float return_x(float x){
-  double v = (init_x * Math.pow( (1-x), 3)) +(3*x * (1-x) * (1-x) * ref1_x) + (3*x*x * (1-x) * ref2_x)+ (Math.pow(x,3) * final_x);
-  return (float)(v);
-}
-float return_y(float x){
-   double v = (init_y * Math.pow( (1-x), 3)) +(3*x * (1-x)*(1-x) * ref1_y) + (3*x*x * (1-x) * ref2_y)+ (Math.pow(x,3) * final_y);
-  return (float)(v);
-}
-}
-
-class MotionProfiler {
-  public ArrayList<BezierProfile> bez;
-  public ArrayList<Point> waypoints;
-  public ArrayList<Point> true_waypoints;
-  public HashMap<Integer, PVector> velocity;
-  public MotionProfiler(ArrayList<BezierProfile> bez, ArrayList<Point> waypoints){
-    this.bez = bez;
-    this.waypoints = waypoints;
-    this.true_waypoints = new ArrayList<Point>();
-  }
-  public MotionProfiler(){
-    this.bez = new ArrayList<BezierProfile>();
-    this.waypoints = new ArrayList<Point>();
-    this.true_waypoints = new ArrayList<Point>();
-    this.velocity = new HashMap<Integer, PVector>();
-  }
-  
-  public ArrayList<Point> parseFile(){
-    ArrayList<Point> ans = new ArrayList<Point>();
-    String[] r = loadStrings("controlPoints.txt");
-    println("SIZE: "  + r.length);
-    for(String line : r){
-       double one = Double.parseDouble(line.substring(0, line.indexOf(":")));
-       double two = Double.parseDouble(line.substring(line.indexOf(":")+1));
-       ans.add(new Point( (float)(one), (float)(two) ) );
-       println("POINT: " + one + " " + two);
+class IDA{
+    HashMap<PVector, Boolean> vis = new HashMap<PVector, Boolean>();
+    HashMap<PVector, ArrayList<GType> > graph = new HashMap<PVector, ArrayList<GType> >();
+    HashMap<PVector, Float> intermediate_results = new HashMap<PVector, Float>();
+    //stores a list of integers which encode the positions they represent
+    ArrayList<PVector> ASTAR_PATH;
+    PVector start,goal;
+    HashMap<PVector, PVector> parent_pointers = new HashMap<PVector, PVector>();
+    ArrayList<PVector> classPath = new ArrayList<PVector>();
+    public int hashCode(float x, float y){
+      int hash = (int)( 1400*(y) + x );
+      //print("HASH:" + hash); 
+      return hash;
     }
-    return ans;
-  }
+    public float euclidean_heuristic_function(Location one, Location two){
+      float f = dist(one.x,one.y,two.x,two.y);
+      return f;
+    }
+    
 
-  public void iterate_profiles(){
-    if(waypoints.size() == 0){
-      waypoints = parseFile();
-      int ITER = 320;
-      println("RUN");
-      if(bez.size() == 0){
-        for(int i = 0; i < waypoints.size()-ITER; i+= ITER){
-          //println(waypoints.get(i).x + " " + waypoints.get(i).y);
-          BezierProfile b = new BezierProfile(waypoints.get(i).x,waypoints.get(i).y,waypoints.get(i+ITER/4).x,waypoints.get(i+ITER/4).y,waypoints.get(i+ITER/2).x,waypoints.get(i+ITER/2).y,waypoints.get(i+ITER).x,waypoints.get(i+ITER).y);
-          bez.add(b);
+    public IDA(HashMap<PVector, ArrayList<GType> > graph, Location start, Location goal){
+      this.start = new PVector(start.x,start.y);
+      this.goal = new PVector(goal.x,goal.y);
+      this.parent_pointers = new HashMap<PVector, PVector>();
+      this.ASTAR_PATH = new ArrayList<PVector>();
+      this.graph = graph;
+    }
+    //start off with heuristic value = 0
+    public ArrayList<Location> IDA_Algo(Location start){
+      return new ArrayList<Location>(); 
+    }
+    
+    
+    public ArrayList<PVector> backtracking(PVector fin){
+      ArrayList<PVector> res = new ArrayList<PVector>();
+      while(fin != null){
+        println(fin.x + "  " + fin.y);
+        res.add(fin);
+        fin = parent_pointers.get(fin);
+      }
+      return res;
+    }
+    /*
+    public ArrayList<Integer> backtrack(int end){
+      println("START BACKTRACKING");
+      ArrayList<Integer> res = new ArrayList<Integer>();
+      while(true){
+        println("CURRENT POSITION: " + end);
+        res.add(end);
+        if(!parent_pointers.containsKey(end)){break;}
+        end= parent_pointers.get(end);
+      }
+      return res;
+    }
+    */
+    
+    public ArrayList<Location> iterative_deepening_astar(){
+      return new ArrayList<Location>();
+    }
+    
+
+    public ArrayList<PVector> IDA(){
+       PriorityQueue<GType> pq = new PriorityQueue(new IDAComparator());
+       GType seed = new GType(start, 0, dist(start.x,start.y,goal.x,goal.y));
+       pq.add(seed);
+       ArrayList<PVector> path = new ArrayList<PVector>();
+       while(pq.size() > 0){
+         GType frnt = pq.poll();
+         float f_cost = frnt.COST_TO_REACH;
+         if(!graph.containsKey(frnt.evec)){continue;}
+         ArrayList<GType> adj = graph.get(frnt.evec);
+         for(GType p : adj){
+           if(intermediate_results.containsKey(p.evec)){continue;}
+           float new_f = f_cost + dist(p.evec.x,p.evec.y,goal.x,goal.y);
+           float new_g = dist(p.evec.x,p.evec.y,goal.x,goal.y);//heuristic for distance
+           if(!intermediate_results.containsKey(p.evec)){
+             intermediate_results.put(p.evec, new_f + new_g);
+             GType g = new GType(p.evec, new_f, new_g);
+             parent_pointers.put(p.evec, frnt.evec);
+             pq.add(g);
+           } else {
+             if(Math.min(intermediate_results.get(p.evec), new_f + new_g) == new_f + new_g){
+               intermediate_results.put(p.evec, new_f + new_g);
+               GType ng = new GType(p.evec, new_f, new_g);
+               pq.add(ng);
+               parent_pointers.put(p.evec, frnt.evec);
+             }
+           }
+         }
+      }
+       println("TERMINATE");
+       path = backtracking(goal);
+       this.classPath = path;
+       println("OPTIMAL PATH LENGTH: " + intermediate_results.get(goal) );
+       return path;
+    }
+    
+    public ArrayList<PVector> augment_waypoints(float STEP){
+      for(PVector p : this.classPath){
+        println(p.x + " " + p.y);
+      }
+      println("-----------------------------------------------------------");
+      
+      ArrayList<PVector> RRT_waypoints = new ArrayList<PVector>();
+      Collections.reverse(this.classPath);
+      for(int i = 0; i < classPath.size()-1; i++){
+        float total_dist = sqrt(dist(classPath.get(i).x,classPath.get(i).y,classPath.get(i+1).x,classPath.get(i+1).y));
+        float slope = (float)(classPath.get(i).y-classPath.get(i+1).y)/(float)(classPath.get(i).x-classPath.get(i+1).x);
+        float angle = atan(slope)+(PI/(float)(2));
+        
+        PVector param = new PVector(classPath.get(i).x,classPath.get(i).y);
+        PVector cur_point = new PVector(classPath.get(i).x,classPath.get(i).y);
+        cur_point.sub(classPath.get(i+1));
+        cur_point.x *= -1;
+        cur_point.y *= -1;
+        float VL = 0;
+        println(cur_point.x + ":" + cur_point.y);
+        float eps = 0.02;
+        while(VL <= 0.3){
+          println("J VALUE: " + VL);
+          if(fillPathInfo){
+            controlPoints.println(param.x + ":" + param.y);
+          }
+          RRT_waypoints.add(param);
+          param = new PVector( (float)(param.x) + (float)(cur_point.x*VL), (float)(param.y) + (float)(cur_point.y*VL) );
+          VL += STEP; //when i do j += STEP in this line, the RRT flips out for some reason
+        }     
+      }
+      if(fillPathInfo){
+        for(int i = 0; i < MotionProfiler.ITER; i++){
+          controlPoints.println(goal_loc.x + ":" + goal_loc.y);
         }
       }
+      controlPoints.flush();
+      controlPoints.close();
+      println("RRT WAYPOINTS SIZE: " + RRT_waypoints.size());
+      return RRT_waypoints;
     }
-    for(BezierProfile b : bez){
-      for(float j = 0; j <= 1.0; j += 0.04){
-        fill(255,0,0);
-        println(b.return_x(j) + " " + b.return_y(j));
-        true_waypoints.add(new Point(b.return_x(j), b.return_y(j)));
-        fill(255,0,0);
-        ellipse(b.return_x(j), b.return_y(j), 5, 5);
-      }
-    }
-  }
-  
-  public void generate_primitive_profiles(){
-    for(int i = 0; i < true_waypoints.size(); i++){
-    }
-  }
-  
-  
-  
+    
+    
+    
 }
-
  
