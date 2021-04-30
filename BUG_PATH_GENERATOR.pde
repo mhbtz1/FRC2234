@@ -1,3 +1,4 @@
+
 //bug pathfinding algorithm presentation:
 //https://spacecraft.ssl.umd.edu/academics/788XF14/788XF14L14/788XF14L14.pathbugsmapsx.pdf
 
@@ -62,7 +63,7 @@ PrintWriter controlPoints;
 static final int CIRC_RADIUS = 8;
 ArrayList<Location> bad_places = new ArrayList<Location>();
 Location current_loc = new Location(200,300);
-Location goal_loc = new Location(800,400);
+Location goal_loc = new Location(1200,800);
 boolean draw_obstacle = true;
 boolean SET_OF_WAYPOINTS = true;
 float OPT_X=-1,OPT_Y=-1;
@@ -81,13 +82,14 @@ boolean BUGNAV_ONE = false;
 boolean BUGNAV_TWO = false;
 boolean TEST_BEZIER_CURVE = false;
 boolean TEST_RRT = true;
+boolean fillPathInfo = true;
 
 public void setup(){
   size(1400,1400);
   frameRate(20);
-  tbez = new BezierProfile(0,0,120,120,240,120,360,0);
-  gen_waypoints();
-  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 440);
+  //tbez = new BezierProfile(0,0,120,120,240,120,360,0);
+  //gen_waypoints();
+  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 1000);
   
   //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
   bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
@@ -95,7 +97,9 @@ public void setup(){
 
   String[] r = loadStrings("controlPoints.txt");
   //if(!SET_OF_WAYPOINTS){
-  controlPoints = createWriter("controlPoints.txt"); 
+  if(fillPathInfo){
+    controlPoints = createWriter("controlPoints.txt"); 
+  }
   mr = new MotionProfiler();
 }
 
@@ -324,66 +328,82 @@ public void draw(){
    //path_planning_one();
    //if(!draw_obstacle){
    background(255);
-   if(TEST_RRT){
-    if(!myRRT.rrtExploration()){
-      myRRT.displayRRT(myRRT.seed);
-      myRRT.reset();
-      
-      //when we run IDA, we want to check to go to the node which is closest to our goal node (in the case that our goal node isn't in the RRT, which it likely isnt.)
-      Location target = null;
-      float rmin = 1000000007;
-      for(PVector g : myRRT.graph.keySet()){
-        rmin = min(rmin, dist(g.x,g.y,goal_loc.x,goal_loc.y) );
-        if(rmin == dist(g.x,g.y,goal_loc.x,goal_loc.y) ){
-          target = new Location(g.x,g.y); //make a copy of it so that original isnt edited
+   if(!draw_obstacle){
+     if(TEST_RRT){
+      fill(255,0,0);
+      circle(goal_loc.x, goal_loc.y, 8);
+      if(!myRRT.rrtExploration()){
+        myRRT.displayRRT(myRRT.seed);
+        myRRT.reset();
+        
+        //when we run IDA, we want to check to go to the node which is closest to our goal node (in the case that our goal node isn't in the RRT, which it likely isnt.)
+        Location target = null;
+        float rmin = 1000000007;
+        for(PVector g : myRRT.graph.keySet()){
+          rmin = min(rmin, dist(g.x,g.y,goal_loc.x,goal_loc.y) );
+          if(rmin == dist(g.x,g.y,goal_loc.x,goal_loc.y) ){
+            target = new Location(g.x,g.y); //make a copy of it so that original isnt edited
+          }
         }
+        ida = new IDA(myRRT.graph, current_loc, target);
+        ArrayList<PVector> myPath = ida.IDA();
+        for(int i = 0; i < myPath.size()-1; i++){
+          stroke(255,0,255);
+          line(myPath.get(i).x, myPath.get(i).y, myPath.get(i+1).x, myPath.get(i+1).y);
+        }
+        ArrayList<PVector> augmented = ida.augment_waypoints(0.04);
+        for(PVector p: augmented){fill(255,0,255); circle(p.x,p.y,4);}
+        MotionProfiler M_P = new MotionProfiler();
+        M_P.iterate_profiles();
+        fill(0,255,0);
+        for(Location true_w : M_P.true_waypoints){
+          circle(true_w.x, true_w.y, 8);
+        }
+        stroke(0,0,255);
       }
-      ida = new IDA(myRRT.graph, current_loc, target);
-      ArrayList<PVector> myPath = ida.IDA();
-      for(int i = 0; i < myPath.size()-1; i++){
-        stroke(255,0,255);
-        line(myPath.get(i).x, myPath.get(i).y, myPath.get(i+1).x, myPath.get(i+1).y);
-      }
-      ArrayList<PVector> augmented = ida.augment_waypoints(0.04);
-      for(PVector p: augmented){fill(255,0,255); circle(p.x,p.y,4);}
-      MotionProfiler M_P = new MotionProfiler();
-      M_P.iterate_profiles();
-      fill(0,255,0);
-      for(Location true_w : M_P.true_waypoints){
-        circle(true_w.x, true_w.y, 8);
-      }
-      stroke(0,0,255);
-    }
+     }
+     String[] s = loadStrings("goal.txt");
+     String line = s[0]; 
+     int one = Integer.parseInt(line.substring(0, line.indexOf(":")));
+     int two = Integer.parseInt(line.substring(line.indexOf(":")+1));
+     if(one != this.goal_loc.x || two != this.goal_loc.y){
+       this.goal_loc = new Location(one,two);
+     }
+       for(Location l : bad_places){
+          ellipse(l.x,l.y,8,8);
+       }
+       if(TANGENT_BUG){
+         if(!SET_OF_WAYPOINTS){
+           //println("TANGENT PATHING");
+           tbg.tangent_bug_path_planning();
+         }
+       } else if(BUGNAV_ONE){  
+         if(!SET_OF_WAYPOINTS){
+           path_planning_one();
+         }
+       } else if(BUGNAV_TWO){
+         if(!SET_OF_WAYPOINTS){
+           if(!path_planning_two(bg)){
+             bg.current_loc.x += 10;
+          }
+         }
+       }
+       
+       /*
+       if(SET_OF_WAYPOINTS){
+         mr.iterate_profiles();
+       }
+       */
+     //}
+     //path_planning_two();
    }
    
-     for(Location l : bad_places){
-        ellipse(l.x,l.y,8,8);
-     }
-     if(TANGENT_BUG){
-       if(!SET_OF_WAYPOINTS){
-         //println("TANGENT PATHING");
-         tbg.tangent_bug_path_planning();
-       }
-     } else if(BUGNAV_ONE){  
-       if(!SET_OF_WAYPOINTS){
-         path_planning_one();
-       }
-     } else if(BUGNAV_TWO){
-       if(!SET_OF_WAYPOINTS){
-         if(!path_planning_two(bg)){
-           bg.current_loc.x += 10;
-        }
-       }
-     }
-     
-     
-     /*
-     if(SET_OF_WAYPOINTS){
-       mr.iterate_profiles();
-     }
-     */
-   //}
-   //path_planning_two();
+   for(Location l : bad_places){
+     fill(255,0,0);
+     noStroke();
+     //println("POSITION: " + l.x + " " + l.y);
+     circle(l.x, l.y, 8);
+   }
 }
 
 public void mouseDragged(){
