@@ -111,10 +111,12 @@ class RRT{
        MAX_DISTS.add( (float)(DIST) );
        pq.clear();
      }
+     /*
      for(int i = 0; i < MAX_DISTS.size(); i++){
        println(MAX_DISTS.get(i));
      }
      println("-----------------------------------------------");
+     */
      ArrayList<Float> nxt = softmax(MAX_DISTS);
      ArrayList<PVector> sample = new ArrayList<PVector>();
      for(int i = 0; i < nxt.size(); i++){
@@ -140,6 +142,7 @@ class RRT{
    //check if the edge overlaps with any part of the obstacles in our space
    //if so return FALSE, otherwise return TRUE
    public boolean IN_FREE_SPACE(){
+    
      return false;
    }
    
