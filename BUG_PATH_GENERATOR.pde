@@ -74,6 +74,7 @@ float LET_IT_RUN = 15;//if we encounter a glitch where we reach the end of an ob
 boolean INITIATE_COOLDOWN = false;
 float COOLDOWN = 0;
 boolean USE_FIRST_HEURISTIC = false;
+boolean GOAL_STATE_CHANGED = false;
 
 
 //use this for toggling different heuristics
@@ -89,7 +90,7 @@ public void setup(){
   frameRate(20);
   //tbez = new BezierProfile(0,0,120,120,240,120,360,0);
   //gen_waypoints();
-  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 35, 1000);
+  myRRT = new RRT(new PVector(current_loc.x,current_loc.y), 45, 1000);
   
   //using new() for the constructors makes it so the slope itself is not updating as the bug moves(we have to make a copy of it)
   bg = new Bug(18, new ArrayList<Location>(), new Location(current_loc.x,current_loc.y), new Location(goal_loc.x,goal_loc.y) );
@@ -327,7 +328,7 @@ boolean is_reversed(float OPT_X, float OPT_Y, float PREV_OPT_X, float PREV_OPT_Y
 public void draw(){
    //path_planning_one();
    //if(!draw_obstacle){
-   background(255);
+   background(0);
    if(!draw_obstacle){
      if(TEST_RRT){
       fill(255,0,0);
@@ -368,6 +369,7 @@ public void draw(){
      int two = Integer.parseInt(line.substring(line.indexOf(":")+1));
      if(one != this.goal_loc.x || two != this.goal_loc.y){
        this.goal_loc = new Location(one,two);
+       GOAL_STATE_CHANGED = true;
      }
        for(Location l : bad_places){
           ellipse(l.x,l.y,8,8);
