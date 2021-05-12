@@ -81,7 +81,7 @@ class MotionProfiler {
   public ArrayList<Location> true_waypoints;
   public HashMap<Integer, Float> angle_profile;
   public HashMap<Integer, Location> velocity_profile;
-  public static final int ITER = 70;
+  public static final int ITER = 20;
   
   public MotionProfiler(ArrayList<BezierProfile> bez, ArrayList<Location> waypoints){
     this.bez = bez;
@@ -176,6 +176,7 @@ class MotionProfiler {
             fill(0,255,0);
             ellipse(b.return_x(j), b.return_y(j), 5, 5);
             true_waypoints.add(new Location(b.return_x(j), b.return_y(j)));
+            bezierPoints.println(b.return_x(j) + ":" + b.return_y(j));
             ++idx;
           }
         }
@@ -228,5 +229,6 @@ class MotionProfiler {
   
 }
 
+ 
 
  
