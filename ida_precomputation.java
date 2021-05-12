@@ -1,3 +1,4 @@
+
 //iterative deepening A*
 import java.util.*;
 
@@ -27,7 +28,6 @@ class IDA{
     PVector start,goal;
     HashMap<PVector, PVector> parent_pointers = new HashMap<PVector, PVector>();
     ArrayList<PVector> classPath = new ArrayList<PVector>();
-    boolean fillPathInfo = true;
     public int hashCode(float x, float y){
       int hash = (int)( 1400*(y) + x );
       //print("HASH:" + hash); 
@@ -121,8 +121,11 @@ class IDA{
         println(p.x + " " + p.y);
       }
       println("-----------------------------------------------------------");
-      
+      if(GOAL_STATE_CHANGED){
+        controlPoints = createWriter("controlPoints.txt");
+      }
       ArrayList<PVector> RRT_waypoints = new ArrayList<PVector>();
+      Collections.reverse(this.classPath);
       for(int i = 0; i < classPath.size()-1; i++){
         float total_dist = sqrt(dist(classPath.get(i).x,classPath.get(i).y,classPath.get(i+1).x,classPath.get(i+1).y));
         float slope = (float)(classPath.get(i).y-classPath.get(i+1).y)/(float)(classPath.get(i).x-classPath.get(i+1).x);
@@ -146,10 +149,14 @@ class IDA{
           VL += STEP; //when i do j += STEP in this line, the RRT flips out for some reason
         }     
       }
+      if(fillPathInfo){
+        for(int i = 0; i < MotionProfiler.ITER; i++){
+          controlPoints.println(goal_loc.x + ":" + goal_loc.y);
+        }
+      }
+      controlPoints.flush();
+      controlPoints.close();
       println("RRT WAYPOINTS SIZE: " + RRT_waypoints.size());
       return RRT_waypoints;
-    }
-    
-    
-    
+    }   
 }
