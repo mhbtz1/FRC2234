@@ -13,7 +13,7 @@ class PDist{
 
 class PQComparator implements Comparator<PDist>{
   public int compare(PDist one, PDist two){
-     if(one.dist > two.dist){
+     if(one.dist >= two.dist){
        return 1;
      }
      return 0;
@@ -139,11 +139,15 @@ class RRT{
    }
    
    //given a new node we want to add to our RRT and the node it is connected to
-   //check if the edge overlaps with any part of the obstacles in our space
+   //check if the edge overlaps with any part of the obstacles in our space (divide space into C(free) and C(obs) )
    //if so return FALSE, otherwise return TRUE
-   public boolean IN_FREE_SPACE(){
-    
-     return false;
+   //we'll just sample the points along the line and detect if some point exists within the convex polygon produced by some obstacle.
+   public boolean IN_FREE_SPACE(PVector new_segment){
+     double delta = 0.01;
+     for(double itr = 0; itr <= 1; itr += delta){
+       //check if some point along a segment lies in some convex hull
+     }
+     return true;
    }
    
    
@@ -151,7 +155,7 @@ class RRT{
    public boolean rrtExploration(){
      println("INTERNAL COUNTER: " + this.INTERNAL_COUNTER);
        float seed = random(0,1);
-       if(this.INTERNAL_COUNTER <= this.MAX_ITER/3){
+       if(this.INTERNAL_COUNTER <= this.MAX_ITER/2){
          PVector rp = new PVector( random(0,1400), random(0,900) );
          PVector closest = nearest_point(rp);
          float ang = atan( (float)(rp.y-closest.y)/(float)(rp.x-closest.x) );
@@ -181,7 +185,7 @@ class RRT{
          seen_space.add(new_pt);
          this.INTERNAL_COUNTER++;
          return true;
-       } else if(this.INTERNAL_COUNTER > this.MAX_ITER/3 && this.INTERNAL_COUNTER < this.MAX_ITER){
+       } else if(this.INTERNAL_COUNTER > this.MAX_ITER/2 && this.INTERNAL_COUNTER < this.MAX_ITER){
          int nxt = k_nearest_neighbors(K);
          println("INDEX: " + nxt);//issue is we are choosing the same node to expand upon too many times
          PVector corres = seen_space.get(nxt);
