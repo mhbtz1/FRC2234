@@ -55,16 +55,16 @@ class Bug{
 //we will simply draw shapes into the map to give us the obstacles in the space.
 Bug bg;
 TangentBug tbg;
-MotionProfiler mr;
 IDA ida;
 RRT myRRT;
 //Perfect_Preprocessing prcs;
 PrintWriter controlPoints;
+PrintWriter bezierPoints;
 static final int CIRC_RADIUS = 8;
 ArrayList<Location> bad_places = new ArrayList<Location>();
 Location current_loc = new Location(200,300);
 Location goal_loc = new Location(1200,800);
-boolean draw_obstacle = true;
+boolean draw_obstacle = false;
 boolean SET_OF_WAYPOINTS = true;
 float OPT_X=-1,OPT_Y=-1;
 float PREV_OPT_X=-1,PREV_OPT_Y=-1;
@@ -101,7 +101,7 @@ public void setup(){
   if(fillPathInfo){
     controlPoints = createWriter("controlPoints.txt"); 
   }
-  mr = new MotionProfiler();
+  bezierPoints = createWriter("BezierControlPoints.txt");
 }
 
 public float[] change_x = {0.5,0,-0.5,0};
@@ -329,6 +329,7 @@ public void draw(){
    //path_planning_one();
    //if(!draw_obstacle){
    background(0);
+   MotionProfiler M_P = new MotionProfiler();
    if(!draw_obstacle){
      if(TEST_RRT){
       fill(255,0,0);
@@ -336,7 +337,6 @@ public void draw(){
       if(!myRRT.rrtExploration()){
         myRRT.displayRRT(myRRT.seed);
         myRRT.reset();
-        
         //when we run IDA, we want to check to go to the node which is closest to our goal node (in the case that our goal node isn't in the RRT, which it likely isnt.)
         Location target = null;
         float rmin = 1000000007;
@@ -354,7 +354,6 @@ public void draw(){
         }
         ArrayList<PVector> augmented = ida.augment_waypoints(0.04);
         for(PVector p: augmented){fill(255,0,255); circle(p.x,p.y,4);}
-        MotionProfiler M_P = new MotionProfiler();
         M_P.iterate_profiles();
         fill(0,255,0);
         for(Location true_w : M_P.true_waypoints){
@@ -398,6 +397,8 @@ public void draw(){
        */
      //}
      //path_planning_two();
+   } else {
+    //M_P.iterate_profiles();
    }
    
    for(Location l : bad_places){
